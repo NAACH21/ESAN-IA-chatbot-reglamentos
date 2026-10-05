@@ -1,0 +1,23 @@
+# Entorno y credenciales privadas (NUNCA subir a GitHub)
+.env
+.env.local
+.streamlit/secrets.toml
+
+# Base de datos vectorial local (se genera con ingest.py)
+chroma_db/
+
+# Python cache y entornos virtuales
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Sistema y temporales
+.DS_Store
+Thumbs.db
+*.log

@@ -10,11 +10,18 @@ try:
 except ImportError:
     pass
 
+import importlib
+import ingest
+importlib.reload(ingest)
+import rag_engine
+importlib.reload(rag_engine)
+
 from ingest import (
     build_vector_store,
     remove_document_from_store,
     index_single_pdf,
     restore_archived_documents,
+    is_supported_file,
     DOCS_FOLDER,
     ARCHIVE_FOLDER
 )
@@ -215,9 +222,13 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # Carga en vivo de nuevo PDF (Revisión de documentos en línea)
-    with st.expander("Cargar nuevo documento en vivo (PDF)"):
-        uploaded_pdf = st.file_uploader("Subir reglamento o directiva PDF", type=["pdf"], label_visibility="collapsed")
+    # Carga en vivo de nuevo archivo (.pdf, .docx, .xlsx)
+    with st.expander("Cargar documento en vivo (PDF, Word, Excel)"):
+        uploaded_pdf = st.file_uploader(
+            "Subir reglamento, directiva o matriz (.pdf, .docx, .xlsx)",
+            type=["pdf", "docx", "xlsx"],
+            label_visibility="collapsed"
+        )
         if uploaded_pdf is not None:
             save_path = os.path.join(DOCS_FOLDER, uploaded_pdf.name)
             with open(save_path, "wb") as f:
@@ -232,7 +243,7 @@ with st.sidebar:
 
     # Mostrar lista de documentos disponibles con botón de eliminación individual
     if os.path.exists(DOCS_FOLDER):
-        docs = sorted([f for f in os.listdir(DOCS_FOLDER) if f.lower().endswith(".pdf") and "(1)" not in f])
+        docs = sorted([f for f in os.listdir(DOCS_FOLDER) if is_supported_file(f)])
         with st.expander(f"Documentos vigentes ({len(docs)})", expanded=False):
             for idx_d, d in enumerate(docs):
                 col_doc, col_del = st.columns([4, 1.3])
@@ -246,7 +257,7 @@ with st.sidebar:
 
         # Opción de restaurar si se eliminó algún documento durante la demo
         if os.path.exists(ARCHIVE_FOLDER):
-            archived_docs = [f for f in os.listdir(ARCHIVE_FOLDER) if f.lower().endswith(".pdf")]
+            archived_docs = [f for f in os.listdir(ARCHIVE_FOLDER) if is_supported_file(f)]
             if archived_docs:
                 if st.button(f"Restaurar eliminados ({len(archived_docs)})", use_container_width=True):
                     restored = restore_archived_documents()

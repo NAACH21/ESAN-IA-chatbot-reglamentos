@@ -18,11 +18,18 @@ import chromadb
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 DOCS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "DOCS")
 ARCHIVE_FOLDER = os.path.join(DOCS_FOLDER, "_archivados")
+SUPPORTED_EXTENSIONS = (".pdf", ".docx", ".xlsx")
 
-def detect_section_or_article(text: str) -> str:
-    """Detecta referencias a Títulos, Capítulos o Artículos dentro del fragmento."""
+def is_supported_file(filename: str) -> bool:
+    lower = filename.lower()
+    return lower.endswith(SUPPORTED_EXTENSIONS) and not lower.startswith("~$") and "(1)" not in filename
+
+def detect_section_or_article(text: str, default_hint: str = "") -> str:
+    """Detecta referencias a Títulos, Capítulos, Artículos o Hojas dentro del fragmento."""
     matches = []
-    
+    if default_hint:
+        matches.append(default_hint)
+        
     cap_match = re.search(r'(CAP[ÍI]TULO\s+[IVXLCDM\d]+|T[ÍI]TULO\s+[IVXLCDM\d]+)', text, re.IGNORECASE)
     if cap_match:
         matches.append(cap_match.group(1).upper())
@@ -41,7 +48,7 @@ def detect_section_or_article(text: str) -> str:
     return "Sección General / Normativa"
 
 def extract_text_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
-    """Extrae texto página por página con metadata."""
+    """Extrae texto página por página de un PDF."""
     reader = PdfReader(pdf_path)
     filename = os.path.basename(pdf_path)
     pages_data = []
@@ -54,9 +61,107 @@ def extract_text_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
             pages_data.append({
                 "filename": filename,
                 "page": page_num,
-                "text": text
+                "text": text,
+                "section_hint": ""
             })
     return pages_data
+
+def extract_text_from_docx(docx_path: str) -> List[Dict[str, Any]]:
+    """Extrae párrafos y tablas de un archivo Word (.docx)."""
+    import docx
+    doc = docx.Document(docx_path)
+    filename = os.path.basename(docx_path)
+    blocks = []
+    current_lines = []
+    current_len = 0
+    block_num = 1
+    current_heading = "Documento Word"
+
+    for para in doc.paragraphs:
+        t = para.text.strip()
+        if not t:
+            continue
+        if para.style and "Heading" in para.style.name:
+            current_heading = t[:60]
+        current_lines.append(t)
+        current_len += len(t)
+        if current_len >= 1800:
+            blocks.append({
+                "filename": filename,
+                "page": block_num,
+                "text": "\n".join(current_lines),
+                "section_hint": current_heading
+            })
+            block_num += 1
+            current_lines = []
+            current_len = 0
+
+    # Extraer tablas del Word si existen
+    for t_idx, table in enumerate(doc.tables, start=1):
+        table_lines = []
+        for row in table.rows:
+            cells = [c.text.strip().replace("\n", " ") for c in row.cells]
+            if any(cells):
+                table_lines.append(" | ".join(cells))
+        if table_lines:
+            current_lines.append(f"[Tabla #{t_idx}]\n" + "\n".join(table_lines))
+
+    if current_lines:
+        blocks.append({
+            "filename": filename,
+            "page": block_num,
+            "text": "\n".join(current_lines),
+            "section_hint": current_heading
+        })
+    return blocks
+
+def extract_text_from_xlsx(xlsx_path: str) -> List[Dict[str, Any]]:
+    """Extrae hojas y filas estructuradas de un archivo Excel (.xlsx)."""
+    import openpyxl
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    filename = os.path.basename(xlsx_path)
+    sheets_data = []
+
+    for sheet_idx, sheet_name in enumerate(wb.sheetnames, start=1):
+        sheet = wb[sheet_name]
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            continue
+
+        headers = []
+        row_texts = []
+        for r in rows:
+            clean_cells = [str(c).strip() if c is not None else "" for c in r]
+            if not any(clean_cells):
+                continue
+            if not headers:
+                headers = [h if h else f"Col_{i+1}" for i, h in enumerate(clean_cells)]
+                row_texts.append("Columnas: " + " | ".join(headers))
+            else:
+                pairs = [f"{headers[i]}: {val}" for i, val in enumerate(clean_cells) if i < len(headers) and val]
+                if pairs:
+                    row_texts.append(" ; ".join(pairs))
+
+        if row_texts:
+            full_sheet_text = f"Hoja de Excel '{sheet_name}':\n" + "\n".join(row_texts)
+            sheets_data.append({
+                "filename": filename,
+                "page": sheet_idx,
+                "text": full_sheet_text,
+                "section_hint": f"Hoja: {sheet_name}"
+            })
+    return sheets_data
+
+def extract_document_data(file_path: str) -> List[Dict[str, Any]]:
+    """Enruta la extracción según la extensión del archivo (.pdf, .docx, .xlsx)."""
+    lower = file_path.lower()
+    if lower.endswith(".pdf"):
+        return extract_text_from_pdf(file_path)
+    elif lower.endswith(".docx"):
+        return extract_text_from_docx(file_path)
+    elif lower.endswith(".xlsx"):
+        return extract_text_from_xlsx(file_path)
+    return []
 
 def split_into_chunks(text: str, chunk_size: int = 900, overlap: int = 150) -> List[str]:
     """Divide texto en chunks semánticos con solapamiento."""
@@ -89,7 +194,7 @@ def split_into_chunks(text: str, chunk_size: int = 900, overlap: int = 150) -> L
     return chunks
 
 def remove_document_from_store(filename: str, docs_dir: str = DOCS_FOLDER) -> int:
-    """Elimina los vectores de un documento en ChromaDB y retira el PDF de DOCS."""
+    """Elimina los vectores de un documento en ChromaDB y retira el archivo de DOCS."""
     chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
     removed_chunks = 0
     try:
@@ -101,7 +206,6 @@ def remove_document_from_store(filename: str, docs_dir: str = DOCS_FOLDER) -> in
     except Exception:
         pass
 
-    # Mover el archivo a _archivados para que deje de estar en DOCS (con opción de restaurar después de la demo)
     src_path = os.path.join(docs_dir, filename)
     if os.path.exists(src_path):
         os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
@@ -111,7 +215,7 @@ def remove_document_from_store(filename: str, docs_dir: str = DOCS_FOLDER) -> in
     return removed_chunks
 
 def index_single_pdf(api_key: str, pdf_path: str) -> int:
-    """Indexa un único PDF nuevo directamente en la colección existente de ChromaDB."""
+    """Indexa un único archivo nuevo (.pdf, .docx o .xlsx) directamente en ChromaDB."""
     client_ai = OpenAI(api_key=api_key)
     chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
     collection = chroma_client.get_or_create_collection(
@@ -119,13 +223,12 @@ def index_single_pdf(api_key: str, pdf_path: str) -> int:
         metadata={"hnsw:space": "cosine"}
     )
     filename = os.path.basename(pdf_path)
-    # Limpiar si ya existía previamente
     try:
         collection.delete(where={"source": filename})
     except Exception:
         pass
 
-    pages = extract_text_from_pdf(pdf_path)
+    pages = extract_document_data(pdf_path)
     chunks_list = []
     metas_list = []
     ids_list = []
@@ -133,7 +236,7 @@ def index_single_pdf(api_key: str, pdf_path: str) -> int:
     for page in pages:
         chunks = split_into_chunks(page["text"])
         for c_idx, chunk in enumerate(chunks):
-            section_ref = detect_section_or_article(chunk)
+            section_ref = detect_section_or_article(chunk, default_hint=page.get("section_hint", ""))
             chunks_list.append(chunk)
             metas_list.append({
                 "source": filename,
@@ -165,13 +268,13 @@ def restore_archived_documents(docs_dir: str = DOCS_FOLDER) -> List[str]:
     restored = []
     if os.path.exists(ARCHIVE_FOLDER):
         for f in os.listdir(ARCHIVE_FOLDER):
-            if f.lower().endswith(".pdf"):
+            if is_supported_file(f):
                 shutil.move(os.path.join(ARCHIVE_FOLDER, f), os.path.join(docs_dir, f))
                 restored.append(f)
     return restored
 
 def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callback=None):
-    """Procesa los PDFs y crea los embeddings en ChromaDB con metadata de sección."""
+    """Procesa todos los archivos (.pdf, .docx, .xlsx) y crea los embeddings en ChromaDB."""
     client_ai = OpenAI(api_key=api_key)
     chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
     
@@ -187,27 +290,25 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
     )
     
     os.makedirs(docs_dir, exist_ok=True)
-    pdf_files = [f for f in os.listdir(docs_dir) if f.lower().endswith(".pdf")]
-    pdf_files = [f for f in pdf_files if not (" (1)" in f or "(1)" in f)]
-    pdf_files.sort()
+    doc_files = sorted([f for f in os.listdir(docs_dir) if is_supported_file(f)])
     
-    total_files = len(pdf_files)
+    total_files = len(doc_files)
     all_chunks = []
     all_metadatas = []
     all_ids = []
     
     doc_counter = 0
-    for idx, pdf_name in enumerate(pdf_files):
-        pdf_path = os.path.join(docs_dir, pdf_name)
+    for idx, doc_name in enumerate(doc_files):
+        file_path = os.path.join(docs_dir, doc_name)
         if progress_callback:
-            progress_callback(f"Extrayendo normativa [{idx+1}/{total_files}]: {pdf_name}")
+            progress_callback(f"Extrayendo documento [{idx+1}/{total_files}]: {doc_name}")
             
-        pages = extract_text_from_pdf(pdf_path)
+        pages = extract_document_data(file_path)
         for page in pages:
             chunks = split_into_chunks(page["text"])
             for c_idx, chunk in enumerate(chunks):
                 doc_counter += 1
-                section_ref = detect_section_or_article(chunk)
+                section_ref = detect_section_or_article(chunk, default_hint=page.get("section_hint", ""))
                 all_chunks.append(chunk)
                 all_metadatas.append({
                     "source": page["filename"],
@@ -241,6 +342,11 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
         collection.add(
             ids=batch_ids,
             embeddings=embeddings,
+            documents=chunks,
+            metadatas=batch_meta
+        ) if False else collection.add(
+            ids=batch_ids,
+            embeddings=embeddings,
             documents=batch_chunks,
             metadatas=batch_meta
         )
@@ -260,4 +366,4 @@ if __name__ == "__main__":
     else:
         print(f"Indexando documentos desde {DOCS_FOLDER}...")
         res = build_vector_store(api_key, progress_callback=print)
-        print(f"Listo! Se indexaron {res['total_files']} PDFs ({res['total_chunks']} chunks).")
+        print(f"Listo! Se indexaron {res['total_files']} documentos ({res['total_chunks']} secciones).")

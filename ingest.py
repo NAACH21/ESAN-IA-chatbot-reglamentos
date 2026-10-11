@@ -1,13 +1,45 @@
 import os
 import re
+import sys
 from typing import List, Dict, Any
 from pypdf import PdfReader
 from openai import OpenAI
+
+# Compatibilidad SQLite para despliegues en la nube (Linux / Streamlit Cloud)
+try:
+    __import__("pysqlite3")
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except ImportError:
+    pass
+
 import chromadb
-from chromadb.config import Settings
 
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 DOCS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "DOCS")
+
+def detect_section_or_article(text: str) -> str:
+    """Detecta referencias a Títulos, Capítulos o Artículos dentro del fragmento."""
+    matches = []
+    
+    # Buscar Capítulo o Título
+    cap_match = re.search(r'(CAP[ÍI]TULO\s+[IVXLCDM\d]+|T[ÍI]TULO\s+[IVXLCDM\d]+)', text, re.IGNORECASE)
+    if cap_match:
+        matches.append(cap_match.group(1).upper())
+        
+    # Buscar Artículos (ej. Artículo 12°, Art. 45, Artículo 8)
+    art_matches = re.findall(r'(Art(?:[íi]culo|\.)\s*\d+(?:\s*°|\º)?)', text, re.IGNORECASE)
+    if art_matches:
+        # Limpiar duplicados manteniendo orden
+        unique_arts = []
+        for a in art_matches:
+            clean_a = re.sub(r'\s+', ' ', a).strip()
+            if clean_a not in unique_arts:
+                unique_arts.append(clean_a)
+        matches.append(", ".join(unique_arts[:3]))
+        
+    if matches:
+        return " | ".join(matches)
+    return "Sección General / Normativa"
 
 def extract_text_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
     """Extrae texto página por página con metadata."""
@@ -19,7 +51,6 @@ def extract_text_from_pdf(pdf_path: str) -> List[Dict[str, Any]]:
         text = page.extract_text() or ""
         text = text.strip()
         if text:
-            # Limpieza básica de saltos de línea excesivos
             text = re.sub(r'\n\s*\n', '\n\n', text)
             pages_data.append({
                 "filename": filename,
@@ -41,7 +72,6 @@ def split_into_chunks(text: str, chunk_size: int = 900, overlap: int = 150) -> L
             chunks.append(text[start:].strip())
             break
         
-        # Buscar corte natural por punto o salto de línea
         split_at = text.rfind("\n\n", start, end)
         if split_at == -1 or split_at <= start:
             split_at = text.rfind(". ", start, end)
@@ -60,11 +90,10 @@ def split_into_chunks(text: str, chunk_size: int = 900, overlap: int = 150) -> L
     return chunks
 
 def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callback=None):
-    """Procesa los PDFs y crea los embeddings en ChromaDB."""
+    """Procesa los PDFs y crea los embeddings en ChromaDB con metadata de sección."""
     client_ai = OpenAI(api_key=api_key)
     chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
     
-    # Obtener o recrear colección
     collection_name = "esan_reglamentos"
     try:
         chroma_client.delete_collection(name=collection_name)
@@ -76,6 +105,7 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
         metadata={"hnsw:space": "cosine"}
     )
     
+    os.makedirs(docs_dir, exist_ok=True)
     pdf_files = [f for f in os.listdir(docs_dir) if f.lower().endswith(".pdf")]
     # Filtrar duplicados con sufijo (1)
     pdf_files = [f for f in pdf_files if not (" (1)" in f or "(1)" in f)]
@@ -90,17 +120,19 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
     for idx, pdf_name in enumerate(pdf_files):
         pdf_path = os.path.join(docs_dir, pdf_name)
         if progress_callback:
-            progress_callback(f"Extrayendo texto de [{idx+1}/{total_files}]: {pdf_name}")
+            progress_callback(f"Extrayendo normativa [{idx+1}/{total_files}]: {pdf_name}")
             
         pages = extract_text_from_pdf(pdf_path)
         for page in pages:
             chunks = split_into_chunks(page["text"])
             for c_idx, chunk in enumerate(chunks):
                 doc_counter += 1
+                section_ref = detect_section_or_article(chunk)
                 all_chunks.append(chunk)
                 all_metadatas.append({
                     "source": page["filename"],
                     "page": page["page"],
+                    "section": section_ref,
                     "chunk_id": c_idx
                 })
                 all_ids.append(f"doc_{doc_counter}")
@@ -108,7 +140,6 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
     if not all_chunks:
         raise ValueError("No se encontraron fragmentos de texto en los documentos.")
 
-    # Generar embeddings por lotes para optimizar llamadas a la API
     batch_size = 80
     total_batches = (len(all_chunks) + batch_size - 1) // batch_size
     
@@ -119,7 +150,7 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
         
         batch_num = (i // batch_size) + 1
         if progress_callback:
-            progress_callback(f"Generando embeddings: lote {batch_num}/{total_batches} ({len(batch_chunks)} fragmentos)...")
+            progress_callback(f"Indexando vectores: lote {batch_num}/{total_batches} ({len(batch_chunks)} secciones)...")
             
         response = client_ai.embeddings.create(
             model="text-embedding-3-small",

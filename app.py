@@ -10,7 +10,14 @@ try:
 except ImportError:
     pass
 
-from ingest import build_vector_store, DOCS_FOLDER
+from ingest import (
+    build_vector_store,
+    remove_document_from_store,
+    index_single_pdf,
+    restore_archived_documents,
+    DOCS_FOLDER,
+    ARCHIVE_FOLDER
+)
 from rag_engine import RAGEngine
 
 load_dotenv()
@@ -215,14 +222,39 @@ with st.sidebar:
             save_path = os.path.join(DOCS_FOLDER, uploaded_pdf.name)
             with open(save_path, "wb") as f:
                 f.write(uploaded_pdf.getbuffer())
-            st.success(f"Archivo '{uploaded_pdf.name}' guardado en DOCS. Haga clic en 'Actualizar / Re-indexar Normativa'.")
+            if api_key and st.button("Indexar este documento ahora", key="btn_index_single", use_container_width=True):
+                with st.spinner(f"Indexando {uploaded_pdf.name} en la base vectorial..."):
+                    n_chunks = index_single_pdf(api_key=api_key, pdf_path=save_path)
+                    st.success(f"'{uploaded_pdf.name}' integrado ({n_chunks} secciones).")
+                    st.rerun()
+            else:
+                st.info(f"Archivo '{uploaded_pdf.name}' guardado en DOCS.")
 
-    # Mostrar lista de documentos disponibles
+    # Mostrar lista de documentos disponibles con botón de eliminación individual
     if os.path.exists(DOCS_FOLDER):
-        docs = [f for f in os.listdir(DOCS_FOLDER) if f.lower().endswith(".pdf") and "(1)" not in f]
-        with st.expander(f"Documentos vigentes ({len(docs)})"):
-            for d in sorted(docs):
-                st.markdown(f"{SVG_FILE} <small>{d}</small>", unsafe_allow_html=True)
+        docs = sorted([f for f in os.listdir(DOCS_FOLDER) if f.lower().endswith(".pdf") and "(1)" not in f])
+        with st.expander(f"Documentos vigentes ({len(docs)})", expanded=False):
+            for idx_d, d in enumerate(docs):
+                col_doc, col_del = st.columns([4, 1.3])
+                with col_doc:
+                    st.markdown(f"{SVG_FILE} <small style='word-break:break-all;'>{d}</small>", unsafe_allow_html=True)
+                with col_del:
+                    if st.button("Quitar", key=f"del_doc_{idx_d}", help=f"Eliminar {d} de la base de datos y de DOCS"):
+                        removed_n = remove_document_from_store(d)
+                        st.toast(f"Documento '{d}' eliminado ({removed_n} secciones borradas de la BD).")
+                        st.rerun()
+
+        # Opción de restaurar si se eliminó algún documento durante la demo
+        if os.path.exists(ARCHIVE_FOLDER):
+            archived_docs = [f for f in os.listdir(ARCHIVE_FOLDER) if f.lower().endswith(".pdf")]
+            if archived_docs:
+                if st.button(f"Restaurar eliminados ({len(archived_docs)})", use_container_width=True):
+                    restored = restore_archived_documents()
+                    if api_key:
+                        with st.spinner("Re-indexando documentos restaurados..."):
+                            for r_doc in restored:
+                                index_single_pdf(api_key, os.path.join(DOCS_FOLDER, r_doc))
+                    st.rerun()
 
     st.markdown("---")
     st.markdown(f'<div class="section-title">{SVG_QUERIES} Casos Frecuentes de Dirección</div>', unsafe_allow_html=True)

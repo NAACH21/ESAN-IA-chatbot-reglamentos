@@ -21,3 +21,6 @@ ENV/
 .DS_Store
 Thumbs.db
 *.log
+
+# Papelera temporal de documentos retirados en demo
+DOCS/_archivados/

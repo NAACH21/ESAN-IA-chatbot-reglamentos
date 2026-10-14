@@ -109,33 +109,61 @@ def _list_drive_folder_api(folder_id: str, api_key: str = "") -> List[Dict]:
 def _list_drive_folder_gdown(folder_id: str) -> List[Dict]:
     """
     Lista archivos usando gdown (sin necesidad de API key).
-    Funciona solo con carpetas compartidas públicamente.
+    Recorre recursivamente todas las subcarpetas de Google Drive.
     """
     import gdown
+    import io
+    import contextlib
+
     url = f"https://drive.google.com/drive/folders/{folder_id}"
+    files_info = []
+
     try:
-        # gdown.download_folder retorna las rutas descargadas, pero
-        # para solo listar usamos get_url_from_url que internamente hace el parse
-        files_info = []
-        # Hacemos una petición al endpoint de drive con el formato que gdown usa
+        # Redirigir stdout y stderr para evitar UnicodeEncodeError en Windows con emojis
+        buff = io.StringIO()
+        with contextlib.redirect_stdout(buff), contextlib.redirect_stderr(buff):
+            items = gdown.download_folder(
+                url=url,
+                skip_download=True,
+                quiet=True,
+                use_cookies=False,
+            )
+
+        if items:
+            for item in items:
+                file_rel = item.path if hasattr(item, "path") else ""
+                name = os.path.basename(file_rel)
+                lower = name.lower()
+                if lower.endswith(tuple(DRIVE_SUPPORTED_MIME.values())):
+                    files_info.append({
+                        "id": getattr(item, "id", None),
+                        "name": name,
+                        "rel_path": file_rel,
+                        "mimeType": "application/pdf" if lower.endswith(".pdf")
+                                    else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    if lower.endswith(".docx")
+                                    else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "modifiedTime": "",
+                    })
+            if files_info:
+                return files_info
+    except Exception:
+        pass
+
+    # Fallback básico por HTML si falla gdown
+    try:
         session = requests.Session()
         session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         })
-        resp = session.get(
-            f"https://drive.google.com/drive/folders/{folder_id}",
-            timeout=20
-        )
-        # Extraer IDs de archivo del HTML con regex
-        ids_found = re.findall(r'"([a-zA-Z0-9_-]{28,})"', resp.text)
+        resp = session.get(f"https://drive.google.com/drive/folders/{folder_id}", timeout=20)
         names_found = re.findall(r'"([^"]+\.(?:pdf|docx|xlsx))"', resp.text, re.IGNORECASE)
-
-        # Construir lista con lo encontrado (ids pueden solaparse)
         unique_names = list(dict.fromkeys(names_found))
         for name in unique_names:
             files_info.append({
-                "id": None,  # No podemos mapear id<->name sin la API
+                "id": None,
                 "name": name,
+                "rel_path": name,
                 "mimeType": "application/pdf" if name.lower().endswith(".pdf")
                             else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             if name.lower().endswith(".docx")
@@ -144,7 +172,7 @@ def _list_drive_folder_gdown(folder_id: str) -> List[Dict]:
             })
         return files_info
     except Exception as e:
-        raise RuntimeError(f"Error al listar la carpeta desde Drive (gdown): {e}")
+        raise RuntimeError(f"Error al listar la carpeta desde Drive: {e}")
 
 
 def list_drive_files(folder_url: str, api_key: str = "") -> List[Dict]:
@@ -263,17 +291,22 @@ def download_full_folder_gdown(folder_url: str, docs_dir: str, progress_callback
     Útil para la primera sincronización. Retorna lista de nombres descargados.
     """
     import gdown
+    import io
+    import contextlib
+
     os.makedirs(docs_dir, exist_ok=True)
     if progress_callback:
-        progress_callback("Descargando carpeta completa desde Google Drive...")
+        progress_callback("Descargando carpeta completa desde Google Drive (con subcarpetas)...")
     try:
-        downloaded = gdown.download_folder(
-            url=folder_url,
-            output=docs_dir,
-            quiet=False,
-            use_cookies=False,
-            remaining_ok=True,
-        )
+        buff = io.StringIO()
+        with contextlib.redirect_stdout(buff), contextlib.redirect_stderr(buff):
+            downloaded = gdown.download_folder(
+                url=folder_url,
+                output=docs_dir,
+                quiet=True,
+                use_cookies=False,
+                remaining_ok=True,
+            )
         if downloaded:
             names = [os.path.basename(p) for p in downloaded]
             if progress_callback:

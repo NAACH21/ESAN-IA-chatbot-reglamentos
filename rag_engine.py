@@ -17,7 +17,7 @@ from ingest import detect_section_or_article
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 COLLECTION_NAME = "esan_reglamentos"
 
-GOOGLE_DRIVE_FOLDER = "https://drive.google.com/drive/folders/1BG9Ud58D9-PioyqyNsYke7NwRMLiXoSi?usp=sharing"
+GOOGLE_DRIVE_FOLDER = "https://drive.google.com/drive/folders/1lVWWDXml31HMsoGxF4OTZMbJE2KLBJ0m"
 
 # Modelos disponibles
 MODELS = {

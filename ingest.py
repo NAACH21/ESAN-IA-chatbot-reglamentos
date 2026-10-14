@@ -22,7 +22,20 @@ SUPPORTED_EXTENSIONS = (".pdf", ".docx", ".xlsx")
 
 def is_supported_file(filename: str) -> bool:
     lower = filename.lower()
-    return lower.endswith(SUPPORTED_EXTENSIONS) and not lower.startswith("~$") and "(1)" not in filename
+    return lower.endswith(SUPPORTED_EXTENSIONS) and not lower.startswith("~$")
+
+def get_all_supported_files(docs_dir: str = DOCS_FOLDER) -> List[str]:
+    """Retorna las rutas completas de todos los archivos soportados recorriendo subcarpetas recursivamente y omitiendo _archivados."""
+    found = []
+    if not os.path.exists(docs_dir):
+        return []
+    for root, dirs, files in os.walk(docs_dir):
+        # Excluir carpetas temporales, de archivo o del sistema
+        dirs[:] = [d for d in dirs if not d.startswith("_") and not d.startswith(".")]
+        for file in files:
+            if is_supported_file(file):
+                found.append(os.path.join(root, file))
+    return sorted(found)
 
 def detect_section_or_article(text: str, default_hint: str = "") -> str:
     """Detecta referencias a Títulos, Capítulos, Artículos o Hojas dentro del fragmento."""
@@ -207,9 +220,15 @@ def remove_document_from_store(filename: str, docs_dir: str = DOCS_FOLDER) -> in
         pass
 
     src_path = os.path.join(docs_dir, filename)
+    if not os.path.exists(src_path):
+        for root, _, files in os.walk(docs_dir):
+            if filename in files:
+                src_path = os.path.join(root, filename)
+                break
+
     if os.path.exists(src_path):
         os.makedirs(ARCHIVE_FOLDER, exist_ok=True)
-        dst_path = os.path.join(ARCHIVE_FOLDER, filename)
+        dst_path = os.path.join(ARCHIVE_FOLDER, os.path.basename(filename))
         shutil.move(src_path, dst_path)
 
     return removed_chunks
@@ -290,16 +309,16 @@ def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callb
     )
     
     os.makedirs(docs_dir, exist_ok=True)
-    doc_files = sorted([f for f in os.listdir(docs_dir) if is_supported_file(f)])
+    doc_paths = get_all_supported_files(docs_dir)
     
-    total_files = len(doc_files)
+    total_files = len(doc_paths)
     all_chunks = []
     all_metadatas = []
     all_ids = []
     
     doc_counter = 0
-    for idx, doc_name in enumerate(doc_files):
-        file_path = os.path.join(docs_dir, doc_name)
+    for idx, file_path in enumerate(doc_paths):
+        doc_name = os.path.basename(file_path)
         if progress_callback:
             progress_callback(f"Extrayendo documento [{idx+1}/{total_files}]: {doc_name}")
             

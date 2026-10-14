@@ -21,6 +21,7 @@ from ingest import (
     index_single_pdf,
     restore_archived_documents,
     is_supported_file,
+    get_all_supported_files,
     DOCS_FOLDER,
     ARCHIVE_FOLDER,
 )
@@ -229,13 +230,24 @@ with st.sidebar:
     except Exception:
         pass
 
-    api_key = st.text_input("OpenAI API Key", value=default_oai, type="password", help="Requerida siempre (embeddings + GPT-4o-mini)")
-    or_key = st.text_input("OpenRouter API Key (MiMo)", value=os.getenv("OPENROUTER_API_KEY", ""), type="password", help="Solo si usas MiMo v2.6 Pro")
+    default_or = os.getenv("OPENROUTER_API_KEY", "")
+    try:
+        default_or = default_or or st.secrets.get("OPENROUTER_API_KEY", "")
+    except Exception:
+        pass
 
-    if api_key:
-        st.markdown(f'<div class="status-ok">{SVG["check"]} Motor IA conectado</div>', unsafe_allow_html=True)
+    has_env = bool(default_oai)
+
+    if has_env:
+        st.markdown(f'<div class="status-ok">{SVG["check"]} Keys cargadas automáticamente (.env)</div>', unsafe_allow_html=True)
+        with st.expander("Ver / Cambiar API Keys", expanded=False):
+            api_key = st.text_input("OpenAI API Key", value=default_oai, type="password", help="Embeddings + GPT-4o-mini")
+            or_key = st.text_input("OpenRouter API Key (MiMo)", value=default_or, type="password", help="MiMo v2.6 Pro")
     else:
         st.markdown(f'<div class="status-warn">{SVG["warn"]} Ingresa tu API Key de OpenAI</div>', unsafe_allow_html=True)
+        api_key = st.text_input("OpenAI API Key", value=default_oai, type="password", help="Embeddings + GPT-4o-mini")
+        or_key = st.text_input("OpenRouter API Key (MiMo)", value=default_or, type="password", help="MiMo v2.6 Pro")
+        st.caption("Tip: Guárdalas en el archivo `.env` para cargarlas sin tener que escribirlas.")
 
     st.markdown("---")
 
@@ -377,12 +389,14 @@ with st.sidebar:
 
     # Doc list with delete
     if os.path.exists(DOCS_FOLDER):
-        docs_list = sorted([f for f in os.listdir(DOCS_FOLDER) if is_supported_file(f)])
-        with st.expander(f"Documentos indexados ({len(docs_list)})"):
-            for i_d, d in enumerate(docs_list):
+        all_doc_paths = get_all_supported_files(DOCS_FOLDER)
+        with st.expander(f"Documentos locales ({len(all_doc_paths)})"):
+            for i_d, p in enumerate(all_doc_paths):
+                d = os.path.basename(p)
+                sub_rel = os.path.relpath(p, DOCS_FOLDER).replace("\\", "/")
                 c1, c2 = st.columns([4, 1.2])
                 with c1:
-                    st.markdown(f"{SVG['file']}<small style='word-break:break-all'>{d}</small>", unsafe_allow_html=True)
+                    st.markdown(f"{SVG['file']}<small style='word-break:break-all'>{sub_rel}</small>", unsafe_allow_html=True)
                 with c2:
                     if st.button("✕", key=f"del_{i_d}", help=f"Quitar {d}"):
                         n_rm = remove_document_from_store(d)

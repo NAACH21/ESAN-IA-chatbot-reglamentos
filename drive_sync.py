@@ -10,7 +10,7 @@ import json
 import tempfile
 import shutil
 import requests
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 
 try:
     __import__("pysqlite3")
@@ -29,6 +29,60 @@ DRIVE_SUPPORTED_MIME = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
 }
+
+MAP_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "drive_file_ids.json")
+DEFAULT_DRIVE_FOLDER = "https://drive.google.com/drive/folders/1lVWWDXml31HMsoGxF4OTZMbJE2KLBJ0m"
+
+def save_drive_id_map(id_map: Dict[str, str]):
+    """Guarda el mapa filename -> drive_file_id en drive_file_ids.json."""
+    try:
+        existing = load_drive_id_map()
+        existing.update(id_map)
+        with open(MAP_FILE, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+def load_drive_id_map() -> Dict[str, str]:
+    """Carga el mapa filename -> drive_file_id."""
+    if os.path.exists(MAP_FILE):
+        try:
+            with open(MAP_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def get_file_drive_url(filename: str, page: Any = None) -> str:
+    """
+    Retorna el enlace directo al archivo específico en Google Drive.
+    Si se especifica la página, agrega el parámetro para abrir directamente en esa página.
+    Si no se encuentra el ID, retorna el enlace a la carpeta principal de Drive.
+    """
+    id_map = load_drive_id_map()
+    clean_name = os.path.basename(filename).strip().lower()
+
+    file_id = None
+    for name, fid in id_map.items():
+        base = os.path.basename(name).strip().lower()
+        if base == clean_name:
+            file_id = fid
+            break
+        if clean_name in base or base in clean_name:
+            file_id = fid
+            break
+
+    if file_id:
+        url = f"https://drive.google.com/file/d/{file_id}/view"
+        if page:
+            try:
+                p_int = int(str(page).strip().split()[0])
+                url += f"#page={p_int}"
+            except Exception:
+                pass
+        return url
+
+    return DEFAULT_DRIVE_FOLDER
 
 # ── Utilidades de ChromaDB ────────────────────────────────────────────────────
 
@@ -115,6 +169,7 @@ def _list_drive_folder_gdown(folder_id: str) -> List[Dict]:
     import io
     import contextlib
 
+    os.environ["PYTHONIOENCODING"] = "utf-8"
     url = f"https://drive.google.com/drive/folders/{folder_id}"
     files_info = []
 
@@ -146,6 +201,8 @@ def _list_drive_folder_gdown(folder_id: str) -> List[Dict]:
                         "modifiedTime": "",
                     })
             if files_info:
+                id_map = {f["name"]: f["id"] for f in files_info if f.get("id")}
+                save_drive_id_map(id_map)
                 return files_info
     except Exception:
         pass
@@ -178,18 +235,17 @@ def _list_drive_folder_gdown(folder_id: str) -> List[Dict]:
 def list_drive_files(folder_url: str, api_key: str = "") -> List[Dict]:
     """
     Lista archivos PDF/DOCX/XLSX de una carpeta pública de Google Drive.
-    Prioriza la API v3 (más precisa) y cae en gdown si no hay api_key.
     """
     folder_id = extract_folder_id(folder_url)
-    try:
-        if api_key:
-            return _list_drive_folder_api(folder_id, api_key)
-        else:
-            # Intentar con API sin key (funciona para carpetas públicas)
-            return _list_drive_folder_api(folder_id, api_key="")
-    except Exception:
-        # Fallback a gdown
-        return _list_drive_folder_gdown(folder_id)
+    if api_key:
+        try:
+            files = _list_drive_folder_api(folder_id, api_key)
+            if files:
+                save_drive_id_map({f["name"]: f["id"] for f in files if f.get("id")})
+                return files
+        except Exception:
+            pass
+    return _list_drive_folder_gdown(folder_id)
 
 
 # ── Descarga individual desde Drive ──────────────────────────────────────────
@@ -305,7 +361,6 @@ def download_full_folder_gdown(folder_url: str, docs_dir: str, progress_callback
                 output=docs_dir,
                 quiet=True,
                 use_cookies=False,
-                remaining_ok=True,
             )
         if downloaded:
             names = [os.path.basename(p) for p in downloaded]

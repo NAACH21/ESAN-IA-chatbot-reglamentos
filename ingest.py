@@ -268,18 +268,25 @@ def index_single_pdf(api_key: str, pdf_path: str) -> int:
     if not chunks_list:
         return 0
 
-    response = client_ai.embeddings.create(
-        model="text-embedding-3-small",
-        input=chunks_list
-    )
-    embeddings = [data.embedding for data in response.data]
+    batch_size = 80
+    for i in range(0, len(chunks_list), batch_size):
+        b_chunks = chunks_list[i : i + batch_size]
+        b_metas = metas_list[i : i + batch_size]
+        b_ids = ids_list[i : i + batch_size]
 
-    collection.add(
-        ids=ids_list,
-        embeddings=embeddings,
-        documents=chunks_list,
-        metadatas=metas_list
-    )
+        response = client_ai.embeddings.create(
+            model="text-embedding-3-small",
+            input=b_chunks
+        )
+        embeddings = [data.embedding for data in response.data]
+
+        collection.add(
+            ids=b_ids,
+            embeddings=embeddings,
+            documents=b_chunks,
+            metadatas=b_metas
+        )
+
     return len(chunks_list)
 
 def restore_archived_documents(docs_dir: str = DOCS_FOLDER) -> List[str]:

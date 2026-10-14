@@ -27,7 +27,13 @@ from ingest import (
     ARCHIVE_FOLDER,
 )
 from rag_engine import RAGEngine, MODELS, GOOGLE_DRIVE_FOLDER
-from drive_sync import sync_from_drive, download_full_folder_gdown, list_drive_files, get_indexed_sources
+from drive_sync import (
+    sync_from_drive,
+    download_full_folder_gdown,
+    list_drive_files,
+    get_indexed_sources,
+    get_file_drive_url,
+)
 
 load_dotenv()
 
@@ -665,18 +671,21 @@ with col3:
             pagina = c.get("pagina", "")
             extracto = c.get("extracto", "")
 
+            doc_drive_url = get_file_drive_url(doc_name, pagina)
+            page_label = f" · Pág. {pagina}" if pagina else ""
+
             st.markdown(f"""
             <div class="cite-card">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
                 <span class="cite-num">{num}</span>
                 <div>
                   <div class="cite-source">{doc_name}</div>
-                  <div class="cite-section">{seccion}{f' · Pág. {pagina}' if pagina else ''}</div>
+                  <div class="cite-section">{seccion}{page_label}</div>
                 </div>
               </div>
               {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
-              <a href="{GOOGLE_DRIVE_FOLDER}" target="_blank" class="drive-link">
-                {SVG["drive"]} Abrir en Google Drive
+              <a href="{doc_drive_url}" target="_blank" class="drive-link">
+                {SVG["drive"]} Abrir documento en Drive {f"(Pág. {pagina})" if pagina else ""}
               </a>
             </div>
             """, unsafe_allow_html=True)

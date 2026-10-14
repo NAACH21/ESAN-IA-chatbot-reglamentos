@@ -188,17 +188,20 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
 
         raw = ""
         try:
-            # Para OpenAI podemos forzar JSON mode directamente
             kwargs = dict(
                 model=model_cfg["model_id"],
                 messages=messages,
                 temperature=0.15,
                 max_tokens=1400,
+                response_format={"type": "json_object"},
             )
-            if model_cfg["provider"] == "openai":
-                kwargs["response_format"] = {"type": "json_object"}
+            try:
+                response = client.chat.completions.create(**kwargs)
+            except Exception:
+                # Si algún modelo no soporta response_format, intentar sin él
+                kwargs.pop("response_format", None)
+                response = client.chat.completions.create(**kwargs)
 
-            response = client.chat.completions.create(**kwargs)
             raw = response.choices[0].message.content.strip()
         except Exception as api_err:
             return {
@@ -209,34 +212,61 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 "citas_normativas": []
             }, sources
 
-        # Limpiar bloque markdown ```json ... ``` si el modelo lo devuelve así
-        clean = raw
-        if clean.startswith("```"):
-            parts = clean.split("```")
-            clean = parts[1] if len(parts) > 1 else clean
-            if clean.startswith("json"):
-                clean = clean[4:]
-            clean = clean.strip()
-
-        # Extraer primer objeto JSON si el modelo devolvió texto antes o después
+        # Parseo multi-capa ultra robusto del JSON
         import re as _re
-        json_match = _re.search(r'\{[\s\S]*\}', clean)
-        if json_match:
-            clean = json_match.group(0)
+        text = raw.strip()
+        # 1. Quitar etiquetas de razonamiento <think>...</think>
+        text = _re.sub(r'<think>[\s\S]*?</think>', '', text).strip()
 
+        # 2. Extraer bloque markdown ```json ... ``` si existe
+        match_codeblock = _re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
+        if match_codeblock:
+            candidate = match_codeblock.group(1).strip()
+        else:
+            match_brace = _re.search(r'\{[\s\S]*\}', text)
+            candidate = match_brace.group(0).strip() if match_brace else text
+
+        parsed = None
+        # 3. Intento 1: json.loads con strict=False (permite saltos de línea literales)
         try:
-            parsed = json.loads(clean)
-            # Asegurarse de que es un dict (no una lista, string u otro tipo)
-            if not isinstance(parsed, dict):
-                raise ValueError(f"Se esperaba un dict, se recibió {type(parsed).__name__}")
-        except Exception as parse_err:
-            parsed = {
-                "requiere_aprobacion": "Respuesta sin estructura JSON",
-                "borrador_alumno": raw,
-                "acciones_coordinadora": [],
-                "razonamiento": f"El modelo no devolvió JSON válido ({parse_err}). Respuesta mostrada tal como fue recibida.",
-                "citas_normativas": []
-            }
+            p = json.loads(candidate, strict=False)
+            if isinstance(p, dict):
+                parsed = p
+        except Exception:
+            pass
+
+        # 4. Intento 2: Limpieza de comas finales (trailing commas)
+        if not parsed:
+            try:
+                candidate_no_commas = _re.sub(r',\s*([\}\]])', r'\1', candidate)
+                p = json.loads(candidate_no_commas, strict=False)
+                if isinstance(p, dict):
+                    parsed = p
+            except Exception:
+                pass
+
+        # 5. Intento 3: Extracción regex de campos clave para evitar que salga el JSON crudo en el borrador
+        if not parsed:
+            parsed = {}
+            m_draft = _re.search(r'"borrador_alumno"\s*:\s*"((?:\\.|[^"\\])*)"', candidate, _re.DOTALL)
+            if m_draft:
+                try:
+                    parsed["borrador_alumno"] = m_draft.group(1).encode().decode('unicode_escape', errors='replace')
+                except Exception:
+                    parsed["borrador_alumno"] = m_draft.group(1)
+            else:
+                clean_raw = _re.sub(r'^```(?:json)?\s*', '', text)
+                clean_raw = _re.sub(r'\s*```$', '', clean_raw).strip()
+                parsed["borrador_alumno"] = clean_raw
+
+            m_appr = _re.search(r'"requiere_aprobacion"\s*:\s*"((?:\\.|[^"\\])*)"', candidate)
+            parsed["requiere_aprobacion"] = m_appr.group(1) if m_appr else "La coordinadora puede resolver directamente"
+
+            m_reas = _re.search(r'"razonamiento"\s*:\s*"((?:\\.|[^"\\])*)"', candidate)
+            parsed["razonamiento"] = m_reas.group(1) if m_reas else ""
+
+            parsed["acciones_coordinadora"] = []
+            parsed["citas_normativas"] = []
 
         # Normalizar citas_normativas: garantizar que cada elemento sea un dict
         raw_citas = parsed.get("citas_normativas", [])

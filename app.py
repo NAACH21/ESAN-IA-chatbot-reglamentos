@@ -17,6 +17,7 @@ importlib.reload(_rag_mod)
 
 from ingest import (
     build_vector_store,
+    index_missing_documents,
     remove_document_from_store,
     index_single_pdf,
     restore_archived_documents,
@@ -413,16 +414,32 @@ with st.sidebar:
                             index_single_pdf(api_key, os.path.join(DOCS_FOLDER, r))
                 st.rerun()
 
-    # Re-indexar (opción manual)
-    if st.button("Actualizar / Re-indexar todo", use_container_width=True, disabled=not bool(api_key)):
-        with st.spinner("Indexando documentos..."):
+    # Indexar solo documentos nuevos / pendientes (incremental)
+    if st.button("Indexar documentos nuevos locales", use_container_width=True, disabled=not bool(api_key), help="Solo indexa los archivos nuevos que no están en la base de datos"):
+        with st.spinner("Buscando e indexando archivos nuevos..."):
             sb = st.empty()
             try:
-                res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb.text(t))
-                st.success(f"{res['total_files']} docs · {res['total_chunks']} secciones")
+                res = index_missing_documents(api_key=api_key, progress_callback=lambda t: sb.text(t))
+                if res["indexed_count"] > 0:
+                    st.success(res["message"])
+                else:
+                    st.info(res["message"])
                 st.rerun()
             except Exception as e:
                 st.error(str(e))
+
+    # Opción para re-indexación completa
+    with st.expander("Re-indexación completa (avanzado)"):
+        st.caption("Borra toda la base de datos vectorial y vuelve a indexar todos los documentos desde cero:")
+        if st.button("Forzar re-indexación total", use_container_width=True, disabled=not bool(api_key), key="btn_force_reindex"):
+            with st.spinner("Re-indexando toda la base documental..."):
+                sb = st.empty()
+                try:
+                    res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb.text(t))
+                    st.success(f"{res['total_files']} docs · {res['total_chunks']} secciones")
+                    st.rerun()
+                except Exception as e:
+                    st.error(str(e))
 
     # Quick cases
     st.markdown("---")

@@ -292,6 +292,56 @@ def restore_archived_documents(docs_dir: str = DOCS_FOLDER) -> List[str]:
                 restored.append(f)
     return restored
 
+def get_indexed_sources() -> List[str]:
+    """Retorna lista de nombres de archivo ya indexados en ChromaDB."""
+    try:
+        chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
+        col = chroma_client.get_collection(name="esan_reglamentos")
+        result = col.get(include=["metadatas"])
+        sources = list({m["source"] for m in result["metadatas"] if "source" in m})
+        return sources
+    except Exception:
+        return []
+
+def index_missing_documents(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callback=None) -> Dict[str, Any]:
+    """
+    Indexación incremental inteligente:
+    Detecta qué archivos de la carpeta local aún NO están en ChromaDB
+    y SOLO procesa e indexa los nuevos/faltantes.
+    NO re-indexa ni vuelve a gastar tokens en los documentos que ya existen.
+    """
+    all_paths = get_all_supported_files(docs_dir)
+    indexed_set = set(get_indexed_sources())
+
+    missing = [p for p in all_paths if os.path.basename(p) not in indexed_set]
+
+    if not missing:
+        return {
+            "indexed_count": 0,
+            "total_chunks": 0,
+            "already_indexed_count": len(indexed_set),
+            "new_files": [],
+            "message": "Todos los documentos ya están indexados. No hay archivos nuevos pendientes."
+        }
+
+    total_chunks = 0
+    new_files = []
+    for idx, path in enumerate(missing, start=1):
+        filename = os.path.basename(path)
+        if progress_callback:
+            progress_callback(f"Indexando archivo nuevo [{idx}/{len(missing)}]: {filename}")
+        chunks = index_single_pdf(api_key, path)
+        total_chunks += chunks
+        new_files.append(filename)
+
+    return {
+        "indexed_count": len(missing),
+        "total_chunks": total_chunks,
+        "already_indexed_count": len(indexed_set),
+        "new_files": new_files,
+        "message": f"Se indexaron {len(missing)} documento(s) nuevo(s) ({total_chunks} secciones)."
+    }
+
 def build_vector_store(api_key: str, docs_dir: str = DOCS_FOLDER, progress_callback=None):
     """Procesa todos los archivos (.pdf, .docx, .xlsx) y crea los embeddings en ChromaDB."""
     client_ai = OpenAI(api_key=api_key)

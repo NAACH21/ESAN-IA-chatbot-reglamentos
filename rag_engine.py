@@ -176,15 +176,15 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         if chat_history:
             for m in chat_history[-4:]:
-                messages.append({"role": m["role"], "content": m["content"]})
+                if isinstance(m, dict):
+                    role = m.get("role", "user")
+                    content = m.get("content", "")
+                else:
+                    role = "user"
+                    content = str(m)
+                if content:
+                    messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": user_content})
-
-        response = client.chat.completions.create(
-            model=model_cfg["model_id"],
-            messages=messages,
-            temperature=0.15,
-            max_tokens=1400,
-        )
 
         raw = ""
         try:

@@ -25,6 +25,7 @@ from ingest import (
     ARCHIVE_FOLDER,
 )
 from rag_engine import RAGEngine, MODELS, GOOGLE_DRIVE_FOLDER
+from drive_sync import sync_from_drive, download_full_folder_gdown, list_drive_files, get_indexed_sources
 
 load_dotenv()
 
@@ -259,35 +260,125 @@ with st.sidebar:
     else:
         st.markdown(f'<div class="status-warn">{SVG["warn"]} Sin indexar</div>', unsafe_allow_html=True)
 
-    if st.button("Actualizar / Re-indexar", use_container_width=True, disabled=not bool(api_key)):
-        with st.spinner("Indexando documentos..."):
-            sb = st.empty()
-            try:
-                res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb.text(t))
-                st.success(f"{res['total_files']} docs · {res['total_chunks']} secciones")
-                st.rerun()
-            except Exception as e:
-                st.error(str(e))
+    # ── Sincronización con Google Drive ──────────────────────────────────────
+    st.markdown("---")
+    st.markdown(f'<div class="sb-section">{SVG["drive"]} Sincronizar con Google Drive</div>', unsafe_allow_html=True)
 
-    # Upload
-    with st.expander("Subir documento (PDF / Word / Excel)"):
-        up = st.file_uploader("Arrastra o selecciona", type=["pdf", "docx", "xlsx"], label_visibility="collapsed")
-        if up:
-            p = os.path.join(DOCS_FOLDER, up.name)
-            with open(p, "wb") as f:
-                f.write(up.getbuffer())
-            if api_key and st.button("Indexar ahora", key="btn_idx_single", use_container_width=True):
-                with st.spinner(f"Indexando {up.name}..."):
-                    n = index_single_pdf(api_key, p)
-                    st.success(f"{n} secciones añadidas")
-                    st.rerun()
-            else:
-                st.info(f"Guardado: {up.name}")
+    drive_url_input = st.text_input(
+        "URL de la carpeta de Drive",
+        value=GOOGLE_DRIVE_FOLDER,
+        help="Pega el enlace de la carpeta compartida de Google Drive",
+        label_visibility="collapsed",
+        placeholder="https://drive.google.com/drive/folders/...",
+    )
+
+    # Vista previa de archivos en Drive
+    if st.button("Ver documentos en Drive", use_container_width=True, key="btn_drive_preview"):
+        with st.spinner("Consultando Google Drive..."):
+            try:
+                drive_files = list_drive_files(drive_url_input)
+                indexed = set(get_indexed_sources())
+                new_in_drive = [f for f in drive_files if f["name"] not in indexed]
+                st.session_state["drive_preview"] = {
+                    "all": drive_files,
+                    "new": new_in_drive,
+                }
+            except Exception as e:
+                st.error(f"Error al consultar Drive: {e}")
+
+    if "drive_preview" in st.session_state and st.session_state["drive_preview"]:
+        preview = st.session_state["drive_preview"]
+        total = len(preview["all"])
+        new_count = len(preview["new"])
+        already = total - new_count
+        st.markdown(
+            f'<div class="status-info">{SVG["book"]} Drive: <b>{total}</b> docs — '
+            f'<b style="color:#16a34a">{already} ya indexados</b> · '
+            f'<b style="color:#d97706">{new_count} nuevos</b></div>',
+            unsafe_allow_html=True,
+        )
+        if preview["new"]:
+            with st.expander(f"Documentos nuevos en Drive ({new_count})"):
+                for nf in preview["new"]:
+                    st.markdown(f"{SVG['file']} <small>{nf['name']}</small>", unsafe_allow_html=True)
+
+    # Botón de sincronización
+    btn_sync_label = "Sincronizar documentos nuevos desde Drive"
+    if st.button(btn_sync_label, use_container_width=True,
+                 disabled=not bool(api_key), key="btn_drive_sync"):
+        if not drive_url_input:
+            st.error("Ingresa la URL de la carpeta de Drive.")
+        else:
+            status_box = st.empty()
+            progress_msgs = []
+
+            def _cb(msg):
+                progress_msgs.append(msg)
+                status_box.text(msg)
+
+            with st.spinner("Sincronizando con Google Drive..."):
+                try:
+                    sync_result = sync_from_drive(
+                        folder_url=drive_url_input,
+                        docs_dir=DOCS_FOLDER,
+                        api_key="",  # carpeta pública, no necesita key
+                        progress_callback=_cb,
+                    )
+                    new_files = sync_result.get("new_files", [])
+                    failed    = sync_result.get("failed", [])
+
+                    if new_files:
+                        _cb(f"Indexando {len(new_files)} documento(s) nuevo(s)...")
+                        for nf in new_files:
+                            path = os.path.join(DOCS_FOLDER, nf)
+                            if os.path.exists(path):
+                                n_chunks = index_single_pdf(api_key, path)
+                                _cb(f"  ✓ {nf} ({n_chunks} secciones)")
+                        st.success(
+                            f"Sincronización completa: {len(new_files)} nuevo(s) indexado(s). "
+                            f"{sync_result['already_indexed']} ya estaban indexados."
+                            + (f" ({len(failed)} fallaron)" if failed else "")
+                        )
+                        # Limpiar preview para que se refresque
+                        st.session_state.pop("drive_preview", None)
+                        st.rerun()
+                    else:
+                        st.info(
+                            f"No hay documentos nuevos en Drive. "
+                            f"({sync_result['already_indexed']} ya indexados, "
+                            f"{sync_result['drive_total']} encontrados en Drive)"
+                        )
+                except Exception as e:
+                    st.error(f"Error durante la sincronización: {e}")
+
+    # Sincronización completa (primera vez o reset)
+    with st.expander("Primera vez o descarga completa"):
+        st.caption("Si es la primera sincronización o quieres re-descargar todo desde Drive:")
+        if st.button("Descargar TODA la carpeta de Drive", use_container_width=True,
+                     disabled=not bool(api_key), key="btn_drive_full"):
+            with st.spinner("Descargando carpeta completa desde Drive..."):
+                sb2 = st.empty()
+                try:
+                    names = download_full_folder_gdown(
+                        drive_url_input, DOCS_FOLDER, progress_callback=lambda t: sb2.text(t)
+                    )
+                    if names:
+                        sb2.text(f"Indexando {len(names)} archivos...")
+                        res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb2.text(t))
+                        st.success(f"{res['total_files']} docs indexados ({res['total_chunks']} secciones)")
+                        st.session_state.pop("drive_preview", None)
+                        st.rerun()
+                    else:
+                        st.warning("No se descargaron archivos. Verifica que la carpeta sea pública.")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+    st.markdown("---")
 
     # Doc list with delete
     if os.path.exists(DOCS_FOLDER):
         docs_list = sorted([f for f in os.listdir(DOCS_FOLDER) if is_supported_file(f)])
-        with st.expander(f"Documentos vigentes ({len(docs_list)})"):
+        with st.expander(f"Documentos indexados ({len(docs_list)})"):
             for i_d, d in enumerate(docs_list):
                 c1, c2 = st.columns([4, 1.2])
                 with c1:
@@ -307,6 +398,17 @@ with st.sidebar:
                         for r in restored:
                             index_single_pdf(api_key, os.path.join(DOCS_FOLDER, r))
                 st.rerun()
+
+    # Re-indexar (opción manual)
+    if st.button("Actualizar / Re-indexar todo", use_container_width=True, disabled=not bool(api_key)):
+        with st.spinner("Indexando documentos..."):
+            sb = st.empty()
+            try:
+                res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb.text(t))
+                st.success(f"{res['total_files']} docs · {res['total_chunks']} secciones")
+                st.rerun()
+            except Exception as e:
+                st.error(str(e))
 
     # Quick cases
     st.markdown("---")

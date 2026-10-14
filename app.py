@@ -37,119 +37,150 @@ from drive_sync import (
 
 load_dotenv()
 
+# ── CARGA SILENCIOSA DE CREDENCIALES (Sin mostrar en la interfaz) ───────────────
+api_key = os.getenv("OPENAI_API_KEY", "")
+try:
+    api_key = api_key or st.secrets.get("OPENAI_API_KEY", "")
+except Exception:
+    pass
+
+or_key = os.getenv("OPENROUTER_API_KEY", "")
+try:
+    or_key = or_key or st.secrets.get("OPENROUTER_API_KEY", "")
+except Exception:
+    pass
+
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Asistente de Coordinación Académica · ESAN",
-    page_icon="https://www.ue.edu.pe/favicon.ico",
+    page_title="Asistente de Coordinación · Universidad ESAN",
+    page_icon="https://cdn.worldvectorlogo.com/logos/universidad-esan.svg",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── SVG ICONS ────────────────────────────────────────────────────────────────
+# ── SVG ICONS EN ROJO ESAN Y NEUTROS ─────────────────────────────────────────
 SVG = {
-    "settings": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#002855" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>""",
-    "db": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#002855" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>""",
-    "file": """<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#002855" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>""",
+    "brain": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"/></svg>""",
+    "db": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>""",
+    "file": """<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>""",
     "check": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>""",
-    "warn": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>""",
-    "book": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>""",
     "drive": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1967D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h6l2 3h1a2 2 0 0 1 2 2z"/></svg>""",
-    "copy": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>""",
-    "wa": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#25D366" style="vertical-align:-2px;margin-right:4px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>""",
+    "sparkles": """<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>""",
+    "send": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>""",
 }
 
-# ── GLOBAL CSS ────────────────────────────────────────────────────────────────
+# ── STYLING INSTITUCIONAL ESAN (ROJO INSTITUCIONAL #D31418) ──────────────────
 st.markdown("""
 <style>
-/* Column cards */
-.col-card {
-    background: #fff;
-    border: 1px solid #E2E8F0;
-    border-radius: 10px;
-    padding: 18px 16px;
-    height: 100%;
+/* Tipografía y fondo principal */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
-.col-number {
-    font-size: 0.7rem;
+
+/* Header Institucional */
+.esan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: #FFFFFF;
+    border: 1px solid #F1F5F9;
+    border-left: 5px solid #D31418;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+}
+.esan-title {
+    font-size: 1.35rem;
     font-weight: 800;
-    color: #94A3B8;
-    letter-spacing: .12em;
-    margin-bottom: 4px;
+    color: #0F172A;
+    line-height: 1.2;
 }
-.col-title {
-    font-size: 1.05rem;
+.esan-title span {
+    color: #D31418;
+}
+.esan-subtitle {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+/* Tarjetas y Contenedores */
+.esan-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    margin-bottom: 16px;
+}
+.esan-card-title {
+    font-size: 1rem;
     font-weight: 700;
-    color: #002855;
+    color: #0F172A;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 14px;
-    border-bottom: 2px solid #E2E8F0;
     padding-bottom: 8px;
+    border-bottom: 1px solid #F1F5F9;
 }
-/* Approval badge */
+
+/* Badge de Aprobación */
 .appr-badge {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    background: #FFF8E1;
-    border: 1px solid #FFD54F;
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    font-size: 0.86rem;
+    align-items: center;
+    gap: 12px;
+    background: #FFFBEB;
+    border: 1px solid #FDE68A;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
 }
 .appr-icon {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
-    background: #FFD54F;
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 1.1rem;
     flex-shrink: 0;
 }
-/* Draft box */
+
+/* Borrador del Alumno */
 .draft-box {
-    background: #F8FAFC;
-    border: 1px solid #CBD5E1;
+    background: #FAFAFA;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #D31418;
     border-radius: 8px;
-    padding: 14px;
-    font-size: 0.88rem;
-    line-height: 1.6;
+    padding: 16px;
+    font-size: 0.92rem;
+    line-height: 1.65;
     color: #1E293B;
     white-space: pre-wrap;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
-/* Action item */
-.action-item {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    padding: 7px 10px;
-    background: #F1F5F9;
-    border-radius: 6px;
-    font-size: 0.84rem;
-    margin-bottom: 5px;
-    color: #334155;
-}
-/* Reasoning box */
-.reason-box {
-    background: #F0FDF4;
-    border-left: 3px solid #22C55E;
-    padding: 10px 12px;
-    border-radius: 4px;
-    font-size: 0.82rem;
-    color: #166534;
-    line-height: 1.5;
-}
-/* Citation card */
+
+/* Tarjeta de Cita Normativa */
 .cite-card {
-    background: #FAFBFF;
-    border: 1px solid #BFDBFE;
-    border-left: 4px solid #2563EB;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 10px;
-    font-size: 0.82rem;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #D31418;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+}
+.cite-card:hover {
+    border-color: #FECACA;
+    border-left-color: #D31418;
+    box-shadow: 0 4px 12px rgba(211,20,24,0.06);
 }
 .cite-num {
     display: inline-flex;
@@ -158,29 +189,33 @@ st.markdown("""
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #2563EB;
-    color: #fff;
+    background: #D31418;
+    color: #FFFFFF;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 800;
     margin-right: 8px;
     flex-shrink: 0;
 }
 .cite-source {
     font-weight: 700;
-    color: #1E3A8A;
+    font-size: 0.88rem;
+    color: #0F172A;
 }
 .cite-section {
-    color: #3B82F6;
-    font-size: 0.78rem;
+    color: #64748B;
+    font-size: 0.8rem;
+    margin-top: 2px;
 }
 .cite-excerpt {
-    background: #FFF9C4;
-    border-radius: 3px;
-    padding: 4px 6px;
-    margin-top: 6px;
+    background: #FFFBEB;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-top: 8px;
+    font-size: 0.82rem;
     font-style: italic;
-    color: #374151;
-    line-height: 1.4;
+    color: #475569;
+    border-left: 2px solid #F59E0B;
+    line-height: 1.45;
 }
 .drive-link {
     display: inline-flex;
@@ -188,26 +223,99 @@ st.markdown("""
     gap: 4px;
     color: #1967D2;
     text-decoration: none;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    margin-top: 6px;
+    padding: 4px 8px;
+    background: #F0F7FF;
+    border-radius: 6px;
+    border: 1px solid #DBEAFE;
+    transition: all 0.15s ease;
 }
-/* Sidebar */
-.sb-section {
-    font-size: 0.85rem;
+.drive-link:hover {
+    background: #E0E7FF;
+    text-decoration: none;
+}
+
+/* Razonamiento */
+.reason-box {
+    background: #F8FAFC;
+    border-left: 3px solid #64748B;
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 0.84rem;
+    color: #334155;
+    line-height: 1.55;
+}
+
+/* Welcome Hero Cards */
+.hero-box {
+    text-align: center;
+    padding: 30px 20px 20px 20px;
+}
+.welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 20px;
+}
+
+/* Bottom Chat Dock (Estilo ChatGPT / Gemini) */
+.chat-dock {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 16px;
+    padding: 14px 18px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin-top: 20px;
+}
+
+/* Botón primario en Rojo ESAN */
+button[kind="primary"] {
+    background-color: #D31418 !important;
+    border-color: #D31418 !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease !important;
+}
+button[kind="primary"]:hover {
+    background-color: #B20D10 !important;
+    border-color: #B20D10 !important;
+    box-shadow: 0 4px 12px rgba(211,20,24,0.25) !important;
+}
+
+/* Status pills */
+.status-pill-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #F0FDF4;
+    border: 1px solid #BBF7D0;
+    color: #166534;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.status-pill-model {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #991B1B;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
     font-weight: 700;
-    color: #002855;
-    margin: 12px 0 6px 0;
+}
+.sb-section {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 14px 0 8px 0;
     display: flex;
     align-items: center;
-}
-.status-ok  { padding:5px 10px; border-radius:6px; background:#F0FDF4; border:1px solid #BBF7D0; color:#166534; font-size:.8rem; margin-bottom:8px; }
-.status-warn{ padding:5px 10px; border-radius:6px; background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; font-size:.8rem; margin-bottom:8px; }
-.status-info{ padding:5px 10px; border-radius:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1E40AF; font-size:.8rem; margin-bottom:8px; }
-/* copy button style override */
-div[data-testid="stButton"] > button[kind="secondary"] {
-    border-radius: 6px;
-    font-size: 0.83rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -222,183 +330,91 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+# ── SIDEBAR (ELECCIÓN DE MODELOS, BASE DOCUMENTAL, SYNC DRIVE) ─────────────────
 with st.sidebar:
-    st.image(
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Logo_Universidad_ESAN.svg/320px-Logo_Universidad_ESAN.svg.png",
-        width=170,
-    )
-
-    # API Keys
-    st.markdown(f'<div class="sb-section">{SVG["settings"]} Credenciales</div>', unsafe_allow_html=True)
-    default_oai = os.getenv("OPENAI_API_KEY", "")
-    try:
-        default_oai = default_oai or st.secrets.get("OPENAI_API_KEY", "")
-    except Exception:
-        pass
-
-    default_or = os.getenv("OPENROUTER_API_KEY", "")
-    try:
-        default_or = default_or or st.secrets.get("OPENROUTER_API_KEY", "")
-    except Exception:
-        pass
-
-    has_env = bool(default_oai)
-
-    if has_env:
-        st.markdown(f'<div class="status-ok">{SVG["check"]} Keys cargadas automáticamente (.env)</div>', unsafe_allow_html=True)
-        with st.expander("Ver / Cambiar API Keys", expanded=False):
-            api_key = st.text_input("OpenAI API Key", value=default_oai, type="password", help="Embeddings + GPT-4o-mini")
-            or_key = st.text_input("OpenRouter API Key (MiMo)", value=default_or, type="password", help="MiMo v2.6 Pro")
+    # Logo oficial actual de ESAN
+    if os.path.exists("assets/logo_esan.svg"):
+        st.image("assets/logo_esan.svg", width=190)
     else:
-        st.markdown(f'<div class="status-warn">{SVG["warn"]} Ingresa tu API Key de OpenAI</div>', unsafe_allow_html=True)
-        api_key = st.text_input("OpenAI API Key", value=default_oai, type="password", help="Embeddings + GPT-4o-mini")
-        or_key = st.text_input("OpenRouter API Key (MiMo)", value=default_or, type="password", help="MiMo v2.6 Pro")
-        st.caption("Tip: Guárdalas en el archivo `.env` para cargarlas sin tener que escribirlas.")
+        st.markdown('<h2 style="color:#D31418;margin:0">UNIVERSIDAD ESAN</h2>', unsafe_allow_html=True)
+
+    st.caption("Coordinación Académica · Soporte Normativo")
+
+    # Indicador silencioso de credenciales conectadas
+    if api_key:
+        st.markdown('<div class="status-pill-ok">● Motor IA activo (.env)</div>', unsafe_allow_html=True)
+    else:
+        st.warning("Configura tu OPENAI_API_KEY en el archivo .env", icon="🔑")
 
     st.markdown("---")
 
-    # Base documental
+    # 1. SELECCIÓN DE MODELO (Movido aquí a la izquierda como pidió el usuario)
+    st.markdown(f'<div class="sb-section">{SVG["brain"]} Modelo de Inteligencia Artificial</div>', unsafe_allow_html=True)
+    model_label = st.radio(
+        "Seleccionar Modelo",
+        options=list(MODELS.keys()),
+        index=0,
+        label_visibility="collapsed",
+        help="Elige el modelo según la complejidad de la consulta normativa."
+    )
+    model_cfg = MODELS[model_label]
+    if model_cfg["provider"] == "openai":
+        st.markdown('<div class="status-pill-model">⚡ OpenAI · GPT-4o-mini (Rápido y económico)</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="status-pill-model">🧠 OpenRouter · MiMo v2.6 Pro (Razonamiento profundo)</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # 2. BASE DOCUMENTAL
     st.markdown(f'<div class="sb-section">{SVG["db"]} Base Documental</div>', unsafe_allow_html=True)
     rag = RAGEngine(api_key=api_key, openrouter_key=or_key) if api_key else None
     is_indexed = rag.is_indexed() if rag else False
 
-    if api_key and not is_indexed and "auto_idx_done" not in st.session_state:
-        st.session_state.auto_idx_done = True
-        with st.spinner("Inicializando base documental..."):
-            try:
-                build_vector_store(api_key=api_key)
-                rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
-                is_indexed = rag.is_indexed()
-            except Exception:
-                pass
-
     if is_indexed:
         cnt = rag.get_document_count()
-        st.markdown(f'<div class="status-info">{SVG["book"]} <b>{cnt}</b> secciones indexadas</div>', unsafe_allow_html=True)
+        st.caption(f"📚 **{cnt:,}** secciones vectorizadas en ChromaDB")
     else:
-        st.markdown(f'<div class="status-warn">{SVG["warn"]} Sin indexar</div>', unsafe_allow_html=True)
+        st.caption("⚠️ Base documental sin inicializar")
 
-    # ── Sincronización con Google Drive ──────────────────────────────────────
-    st.markdown("---")
-    st.markdown(f'<div class="sb-section">{SVG["drive"]} Sincronizar con Google Drive</div>', unsafe_allow_html=True)
-
-    drive_url_input = st.text_input(
-        "URL de la carpeta de Drive",
-        value=GOOGLE_DRIVE_FOLDER,
-        help="Pega el enlace de la carpeta compartida de Google Drive",
-        label_visibility="collapsed",
-        placeholder="https://drive.google.com/drive/folders/...",
-    )
-
-    # Vista previa de archivos en Drive
-    if st.button("Ver documentos en Drive", use_container_width=True, key="btn_drive_preview"):
-        with st.spinner("Consultando Google Drive..."):
-            try:
-                drive_files = list_drive_files(drive_url_input)
-                indexed = set(get_indexed_sources())
-                new_in_drive = [f for f in drive_files if f["name"] not in indexed]
-                st.session_state["drive_preview"] = {
-                    "all": drive_files,
-                    "new": new_in_drive,
-                }
-            except Exception as e:
-                st.error(f"Error al consultar Drive: {e}")
-
-    if "drive_preview" in st.session_state and st.session_state["drive_preview"]:
-        preview = st.session_state["drive_preview"]
-        total = len(preview["all"])
-        new_count = len(preview["new"])
-        already = total - new_count
-        st.markdown(
-            f'<div class="status-info">{SVG["book"]} Drive: <b>{total}</b> docs — '
-            f'<b style="color:#16a34a">{already} ya indexados</b> · '
-            f'<b style="color:#d97706">{new_count} nuevos</b></div>',
-            unsafe_allow_html=True,
+    # 3. SINCRONIZACIÓN CON GOOGLE DRIVE
+    with st.expander("Sincronizar Google Drive"):
+        drive_url_input = st.text_input(
+            "Carpeta Drive",
+            value=GOOGLE_DRIVE_FOLDER,
+            label_visibility="collapsed",
+            placeholder="https://drive.google.com/drive/folders/..."
         )
-        if preview["new"]:
-            with st.expander(f"Documentos nuevos en Drive ({new_count})"):
-                for nf in preview["new"]:
-                    st.markdown(f"{SVG['file']} <small>{nf['name']}</small>", unsafe_allow_html=True)
-
-    # Botón de sincronización
-    btn_sync_label = "Sincronizar documentos nuevos desde Drive"
-    if st.button(btn_sync_label, use_container_width=True,
-                 disabled=not bool(api_key), key="btn_drive_sync"):
-        if not drive_url_input:
-            st.error("Ingresa la URL de la carpeta de Drive.")
-        else:
-            status_box = st.empty()
-            progress_msgs = []
-
-            def _cb(msg):
-                progress_msgs.append(msg)
-                status_box.text(msg)
-
-            with st.spinner("Sincronizando con Google Drive..."):
-                try:
-                    sync_result = sync_from_drive(
-                        folder_url=drive_url_input,
-                        docs_dir=DOCS_FOLDER,
-                        api_key="",  # carpeta pública, no necesita key
-                        progress_callback=_cb,
-                    )
-                    new_files = sync_result.get("new_files", [])
-                    failed    = sync_result.get("failed", [])
-
-                    if new_files:
-                        _cb(f"Indexando {len(new_files)} documento(s) nuevo(s)...")
-                        for nf in new_files:
-                            path = os.path.join(DOCS_FOLDER, nf)
-                            if os.path.exists(path):
-                                n_chunks = index_single_pdf(api_key, path)
-                                _cb(f"  ✓ {nf} ({n_chunks} secciones)")
-                        st.success(
-                            f"Sincronización completa: {len(new_files)} nuevo(s) indexado(s). "
-                            f"{sync_result['already_indexed']} ya estaban indexados."
-                            + (f" ({len(failed)} fallaron)" if failed else "")
-                        )
-                        # Limpiar preview para que se refresque
-                        st.session_state.pop("drive_preview", None)
+        c_sync1, c_sync2 = st.columns(2)
+        with c_sync1:
+            if st.button("Ver en Drive", use_container_width=True, key="btn_sb_drive_preview"):
+                with st.spinner("Consultando Drive..."):
+                    try:
+                        dfiles = list_drive_files(drive_url_input)
+                        idx_set = set(get_indexed_sources())
+                        nuevos = [f for f in dfiles if f["name"] not in idx_set]
+                        st.info(f"{len(dfiles)} docs en Drive ({len(nuevos)} nuevos)")
+                    except Exception as e:
+                        st.error(str(e))
+        with c_sync2:
+            if st.button("Sincronizar", use_container_width=True, disabled=not bool(api_key), key="btn_sb_drive_sync"):
+                with st.spinner("Descargando e indexando nuevos..."):
+                    try:
+                        s_res = sync_from_drive(drive_url_input, docs_dir=DOCS_FOLDER, progress_callback=lambda m: None)
+                        n_added = s_res.get("new_files", [])
+                        for nf in n_added:
+                            p = os.path.join(DOCS_FOLDER, nf)
+                            if os.path.exists(p):
+                                index_single_pdf(api_key, p)
+                        st.success(f"{len(n_added)} nuevo(s) sincronizado(s).")
                         st.rerun()
-                    else:
-                        st.info(
-                            f"No hay documentos nuevos en Drive. "
-                            f"({sync_result['already_indexed']} ya indexados, "
-                            f"{sync_result['drive_total']} encontrados en Drive)"
-                        )
-                except Exception as e:
-                    st.error(f"Error durante la sincronización: {e}")
+                    except Exception as e:
+                        st.error(str(e))
 
-    # Sincronización completa (primera vez o reset)
-    with st.expander("Primera vez o descarga completa"):
-        st.caption("Si es la primera sincronización o quieres re-descargar todo desde Drive:")
-        if st.button("Descargar TODA la carpeta de Drive", use_container_width=True,
-                     disabled=not bool(api_key), key="btn_drive_full"):
-            with st.spinner("Descargando carpeta completa desde Drive..."):
-                sb2 = st.empty()
-                try:
-                    names = download_full_folder_gdown(
-                        drive_url_input, DOCS_FOLDER, progress_callback=lambda t: sb2.text(t)
-                    )
-                    if names:
-                        sb2.text(f"Indexando {len(names)} archivos...")
-                        res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb2.text(t))
-                        st.success(f"{res['total_files']} docs indexados ({res['total_chunks']} secciones)")
-                        st.session_state.pop("drive_preview", None)
-                        st.rerun()
-                    else:
-                        st.warning("No se descargaron archivos. Verifica que la carpeta sea pública.")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    st.markdown("---")
-
-    # Doc list with delete
+    # 4. GESTIÓN DE ARCHIVOS LOCALES
     if os.path.exists(DOCS_FOLDER):
-        all_doc_paths = get_all_supported_files(DOCS_FOLDER)
-        with st.expander(f"Documentos locales ({len(all_doc_paths)})"):
-            for i_d, p in enumerate(all_doc_paths):
+        all_docs = get_all_supported_files(DOCS_FOLDER)
+        with st.expander(f"Documentos locales ({len(all_docs)})"):
+            for i_d, p in enumerate(all_docs):
                 d = os.path.basename(p)
                 sub_rel = os.path.relpath(p, DOCS_FOLDER).replace("\\", "/")
                 c1, c2 = st.columns([4, 1.2])
@@ -410,251 +426,138 @@ with st.sidebar:
                         st.toast(f"'{d}' eliminado ({n_rm} secciones)")
                         st.rerun()
 
-        if os.path.exists(ARCHIVE_FOLDER):
-            arch = [f for f in os.listdir(ARCHIVE_FOLDER) if is_supported_file(f)]
-            if arch and st.button(f"Restaurar eliminados ({len(arch)})", use_container_width=True):
-                restored = restore_archived_documents()
-                if api_key:
-                    with st.spinner("Re-indexando..."):
-                        for r in restored:
-                            index_single_pdf(api_key, os.path.join(DOCS_FOLDER, r))
-                st.rerun()
-
-    # Indexar solo documentos nuevos / pendientes (incremental)
-    if st.button("Indexar documentos nuevos locales", use_container_width=True, disabled=not bool(api_key), help="Solo indexa los archivos nuevos que no están en la base de datos"):
-        with st.spinner("Buscando e indexando archivos nuevos..."):
-            sb = st.empty()
-            try:
-                res = index_missing_documents(api_key=api_key, progress_callback=lambda t: sb.text(t))
-                if res["indexed_count"] > 0:
-                    st.success(res["message"])
-                else:
+            if st.button("Indexar documentos nuevos locales", use_container_width=True, disabled=not bool(api_key)):
+                with st.spinner("Indexando..."):
+                    res = index_missing_documents(api_key=api_key)
                     st.info(res["message"])
-                st.rerun()
-            except Exception as e:
-                st.error(str(e))
-
-    # Opción para re-indexación completa
-    with st.expander("Re-indexación completa (avanzado)"):
-        st.caption("Borra toda la base de datos vectorial y vuelve a indexar todos los documentos desde cero:")
-        if st.button("Forzar re-indexación total", use_container_width=True, disabled=not bool(api_key), key="btn_force_reindex"):
-            with st.spinner("Re-indexando toda la base documental..."):
-                sb = st.empty()
-                try:
-                    res = build_vector_store(api_key=api_key, progress_callback=lambda t: sb.text(t))
-                    st.success(f"{res['total_files']} docs · {res['total_chunks']} secciones")
                     st.rerun()
-                except Exception as e:
-                    st.error(str(e))
 
-    # Quick cases
+    # 5. LIMPIAR SESIÓN
     st.markdown("---")
-    st.markdown("**Casos frecuentes**")
-    quick_cases = [
-        "¿Cuándo puedo pedir reconsideración de nota y a quién?",
-        "¿Cuáles son los requisitos para obtener el Grado de Bachiller?",
-        "¿Cómo se tramita la convalidación de un curso?",
-        "¿Qué pasa si el alumno supera el límite de inasistencias?",
-        "¿Cuáles son los requisitos para postular a beca en el extranjero?",
-    ]
-    for i_q, qc in enumerate(quick_cases):
-        if st.button(qc, key=f"qc_{i_q}", use_container_width=True):
-            st.session_state.quick_q = qc
-
-    if st.button("Limpiar sesión", use_container_width=True):
+    if st.button("Nueva consulta / Limpiar", use_container_width=True):
         st.session_state.history = []
         st.session_state.last_result = None
         st.session_state.last_sources = []
         st.rerun()
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
-  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#002855" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+# ── TOP HEADER INSTITUCIONAL ──────────────────────────────────────────────────
+st.markdown(f"""
+<div class="esan-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="width:40px;height:40px;border-radius:8px;background:#D31418;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.1rem">
+      E
+    </div>
+    <div>
+      <div class="esan-title">Asistente Normativo de Coordinación · <span>ESAN</span></div>
+      <div class="esan-subtitle">Respuestas institucionales oficiales con citas y respaldo reglamentario verificado</div>
+    </div>
+  </div>
   <div>
-    <div style="font-size:1.45rem;font-weight:800;color:#002855;line-height:1.2">Asistente de Coordinación Académica</div>
-    <div style="font-size:0.88rem;color:#64748B">Universidad ESAN · Soporte normativo para Coordinadoras</div>
+    <div class="status-pill-model">
+      {model_label.split('(')[0].strip()}
+    </div>
   </div>
 </div>
-<hr style="border:none;border-top:2px solid #E2E8F0;margin:10px 0 18px 0">
 """, unsafe_allow_html=True)
 
-# ── 3-COLUMN LAYOUT ───────────────────────────────────────────────────────────
-col1, col2, col3 = st.columns([1.15, 1.35, 1.2], gap="medium")
+# ── ÁREA PRINCIPAL: RESULTADOS O PANTALLA DE BIENVENIDA ───────────────────────
+result = st.session_state.last_result
+sources = st.session_state.last_sources
 
-# ═══════════════════════════════════════════════════════════ COLUMNA 01 ═══════
-with col1:
-    st.markdown('<div class="col-number">01</div><div class="col-title">Consulta recibida</div>', unsafe_allow_html=True)
+if result is None:
+    # Pantalla de Bienvenida con tarjetas sugeridas estilo Gemini/GPT
+    st.markdown("""
+    <div class="hero-box">
+      <div style="font-size:1.6rem;font-weight:800;color:#0F172A;margin-bottom:6px">
+        ¿En qué consulta de coordinación académica te puedo ayudar hoy?
+      </div>
+      <div style="font-size:0.92rem;color:#64748B;max-width:680px;margin:0 auto">
+        Escribe la consulta del estudiante en la barra inferior o haz clic en alguno de los casos frecuentes para redactar una respuesta normativa inmediata.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Selector de modelo
-    model_label = st.radio(
-        "Modelo de IA",
-        options=list(MODELS.keys()),
-        index=0,
-        help="GPT-4o-mini: rápido y económico. MiMo v2.6 Pro: razonamiento profundo (requiere OpenRouter Key).",
-    )
-    model_cfg = MODELS[model_label]
-    cost_tag = "~$0.0005/consulta" if model_cfg["provider"] == "openai" else "~$0.00084/consulta"
-    st.caption(f"{'⚡ OpenAI' if model_cfg['provider']=='openai' else '🧠 OpenRouter'} · {cost_tag}")
+    c_c1, c_c2 = st.columns(2)
+    with c_c1:
+        if st.button("📝 Reconsideración de Nota\n\n¿Cuándo y ante quién puede solicitar reconsideración de evaluación?", use_container_width=True):
+            st.session_state.quick_q = "¿Cuándo puedo pedir reconsideración de nota y ante qué autoridad corresponde presentarla?"
+            st.rerun()
 
-    st.markdown("---")
+        if st.button("🤖 Uso de Inteligencia Artificial\n\n¿Cuáles son los lineamientos para docentes y alumnos sobre uso de IA?", use_container_width=True):
+            st.session_state.quick_q = "¿Cuáles son los lineamientos sobre el uso de Inteligencia Artificial para docentes y alumnos en ESAN?"
+            st.rerun()
 
-    # Mensaje del alumno
-    default_q = st.session_state.quick_q or ""
-    student_msg = st.text_area(
-        "Mensaje del alumno",
-        value=default_q,
-        height=130,
-        placeholder="Escribe o pega aquí el mensaje exacto del alumno...",
-        max_chars=4000,
-    )
-    st.caption(f"{len(student_msg)}/4000 caracteres")
-    if st.session_state.quick_q:
-        st.session_state.quick_q = None
+    with c_c2:
+        if st.button("🎓 Requisitos de Grado de Bachiller\n\n¿Cuáles son los requisitos reglamentarios para obtener el grado?", use_container_width=True):
+            st.session_state.quick_q = "¿Cuáles son los requisitos y créditos necesarios para obtener el Grado de Bachiller?"
+            st.rerun()
 
-    extra_ctx = st.text_area(
-        "Contexto adicional (opcional)",
-        height=75,
-        placeholder="Curso, ciclo, fecha de evaluación, antecedentes conocidos del alumno...",
-        max_chars=2000,
-    )
+        if st.button("💰 Devolución de Dinero y Retiro\n\n¿Cuál es el procedimiento y formato para devoluciones o retiro de programa?", use_container_width=True):
+            st.session_state.quick_q = "¿Cuál es el procedimiento formal y plazos para solicitar devolución de dinero o retiro de programa?"
+            st.rerun()
 
-    # Diagnostics: show exactly why the button might be disabled
-    can_resolve = bool(api_key and student_msg.strip())
-    if not api_key:
-        st.warning("Ingresa tu OpenAI API Key en la barra lateral.", icon="🔑")
-    elif not student_msg.strip():
-        st.info("Escribe el mensaje del alumno para habilitar la consulta.", icon="✏️")
+else:
+    # ── VISTA DE RESULTADOS (2 COLUMNAS: RESPUESTA + RESPALDO NORMATIVO) ───────
+    col_resp, col_norm = st.columns([1.35, 1.15], gap="large")
 
-    resolve_btn = st.button(
-        "Resolver consulta",
-        use_container_width=True,
-        disabled=not can_resolve,
-        type="primary",
-    )
+    # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
+    with col_resp:
+        st.markdown(f'<div class="esan-card-title">{SVG["sparkles"]} Respuesta propuesta para Coordinación</div>', unsafe_allow_html=True)
 
-    # History mini-log
-    if st.session_state.history:
-        st.markdown("---")
-        st.caption("Historial de esta sesión")
-        for h in reversed(st.session_state.history[-5:]):
-            st.caption(f"› {h[:80]}...")
-
-# ═══════════════════════════════════════════════════════════ PROCESS ══════════
-if resolve_btn and api_key and student_msg.strip():
-    # Spinner visible en columna 2 para que el usuario vea el progreso
-    with col2:
-        with st.spinner("Analizando normativa y generando respuesta..."):
-            try:
-                # Si la BD no está indexada, indexar automáticamente primero
-                if not is_indexed and api_key:
-                    build_vector_store(api_key=api_key)
-                    rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
-
-                result, sources = rag.answer_question(
-                    query=student_msg.strip(),
-                    context_extra=extra_ctx.strip(),
-                    model_label=model_label,
-                    chat_history=st.session_state.history,
-                )
-                st.session_state.last_result = result
-                st.session_state.last_sources = sources
-                st.session_state.history.append(student_msg.strip()[:120])
-            except Exception as e:
-                st.session_state.last_result = {
-                    "requiere_aprobacion": "Error al procesar",
-                    "borrador_alumno": f"Error: {e}",
-                    "acciones_coordinadora": [],
-                    "razonamiento": str(e),
-                    "citas_normativas": [],
-                }
-                st.session_state.last_sources = []
-    st.rerun()
-
-# ═══════════════════════════════════════════════════════════ COLUMNA 02 ═══════
-with col2:
-    st.markdown('<div class="col-number">02</div><div class="col-title">Respuesta propuesta</div>', unsafe_allow_html=True)
-
-    result = st.session_state.last_result
-
-    if result is None:
-        st.markdown("""
-        <div style="text-align:center;padding:60px 20px;color:#94A3B8">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <div style="margin-top:12px;font-size:0.92rem">Ingresa una consulta en la columna izquierda y haz clic en <b>Resolver consulta</b></div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        # Tarjeta de aprobación
-        appr = result.get("requiere_aprobacion", "")
+        # 1. Badge de Aprobación
+        appr = result.get("requiere_aprobacion", "La coordinadora puede resolver directamente")
         st.markdown(f"""
         <div class="appr-badge">
           <div class="appr-icon">👤</div>
           <div>
-            <div style="font-weight:700;font-size:0.88rem;color:#78350F">Requiere aprobación / validación de:</div>
-            <div style="font-size:0.86rem;color:#451A03;margin-top:2px">{appr}</div>
+            <div style="font-weight:700;font-size:0.86rem;color:#78350F">Requiere aprobación / validación de:</div>
+            <div style="font-size:0.9rem;color:#92400E;font-weight:600;margin-top:2px">{appr}</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Borrador
+        # 2. Borrador para el Alumno
         draft = result.get("borrador_alumno", "")
-        st.markdown("**Borrador para el alumno**")
+        st.markdown("<b style='font-size:0.88rem;color:#0F172A'>Borrador de respuesta para el estudiante</b>", unsafe_allow_html=True)
         st.markdown(f'<div class="draft-box">{draft}</div>', unsafe_allow_html=True)
 
-        # Botones de copia
-        b1, b2 = st.columns(2)
+        # 3. Botones de Copia Rápidos
+        b_c1, b_c2 = st.columns(2)
         wa_text = f"📱 *Coordinación Académica ESAN*\n\n{draft}"
-        mail_text = f"Estimado alumno,\n\n{draft}"
+        mail_text = f"Estimado/a estudiante,\n\n{draft}"
 
-        with b1:
-            if st.button(f"Copiar para WhatsApp", key="cp_wa", use_container_width=True):
+        with b_c1:
+            if st.button("Copiar para WhatsApp", key="btn_cp_wa", use_container_width=True):
                 st.code(wa_text, language=None)
-                st.toast("Texto mostrado — cópialo desde el bloque de arriba")
-
-        with b2:
-            if st.button("Copiar para correo", key="cp_mail", use_container_width=True):
+                st.toast("Texto preparado para WhatsApp — cópialo del recuadro")
+        with b_c2:
+            if st.button("Copiar para Correo", key="btn_cp_mail", use_container_width=True):
                 st.code(mail_text, language=None)
-                st.toast("Texto mostrado — cópialo desde el bloque de arriba")
+                st.toast("Texto preparado para Correo — cópialo del recuadro")
 
-        st.markdown("---")
-
-        # Acciones para la coordinadora
+        # 4. Acciones para la Coordinadora
         actions = result.get("acciones_coordinadora", [])
         if actions:
-            st.markdown("**Acciones para ti**")
+            st.markdown("<b style='font-size:0.88rem;color:#0F172A;margin-top:14px;display:block'>Acciones a verificar por la Coordinadora</b>", unsafe_allow_html=True)
             for act in actions:
-                st.checkbox(act, value=False, key=f"act_{hash(act)}")
+                st.checkbox(act, value=False, key=f"chk_{hash(act)}")
 
-        # Razonamiento
+        # 5. Razonamiento
         reason = result.get("razonamiento", "")
         if reason:
-            with st.expander("Razonamiento del asistente"):
+            with st.expander("Ver razonamiento normativo del asistente"):
                 st.markdown(f'<div class="reason-box">{reason}</div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════ COLUMNA 03 ═══════
-with col3:
-    st.markdown('<div class="col-number">03</div><div class="col-title">Respaldo normativo y documental</div>', unsafe_allow_html=True)
+    # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
+    with col_norm:
+        st.markdown(f'<div class="esan-card-title">{SVG["db"]} Respaldo Normativo y Citas ({len(sources)} fuentes)</div>', unsafe_allow_html=True)
 
-    result = st.session_state.last_result
-    sources = st.session_state.last_sources
-
-    if result is None or not sources:
-        st.markdown("""
-        <div style="text-align:center;padding:60px 20px;color:#94A3B8">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <div style="margin-top:12px;font-size:0.92rem">Las citas normativas aparecerán aquí</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
         citas = result.get("citas_normativas", [])
-        # Mezclar citas del LLM con los sources recuperados para máxima cobertura
         displayed = {}
         for c in citas:
             num = c.get("numero", 0)
             displayed[num] = c
 
-        # Si no hay citas parseadas del LLM, mostrar los sources directos
         if not displayed:
             for i_s, s in enumerate(sources[:6], 1):
                 displayed[i_s] = {
@@ -662,7 +565,7 @@ with col3:
                     "documento": s["source"],
                     "seccion": s["section"],
                     "pagina": str(s["page"]),
-                    "extracto": s["text"][:200],
+                    "extracto": s["text"][:220],
                 }
 
         for num, c in sorted(displayed.items()):
@@ -672,9 +575,7 @@ with col3:
             extracto = c.get("extracto", "")
 
             doc_drive_url = get_file_drive_url(doc_name, pagina)
-            page_label = f" · Pág. {pagina}" if pagina else ""
-
-            badge_page = f'<span style="background:#EFF6FF;color:#1E40AF;padding:2px 8px;border-radius:12px;font-size:0.73rem;font-weight:700;border:1px solid #BFDBFE;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
+            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:12px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
 
             st.markdown(f"""
             <div class="cite-card">
@@ -682,7 +583,7 @@ with col3:
                 <span class="cite-num">{num}</span>
                 <div style="flex:1">
                   <div class="cite-source">{doc_name}</div>
-                  <div class="cite-section" style="margin-top:2px">{seccion}{badge_page}</div>
+                  <div class="cite-section">{seccion}{badge_page}</div>
                 </div>
               </div>
               {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
@@ -690,14 +591,72 @@ with col3:
                 <a href="{doc_drive_url}" target="_blank" class="drive-link">
                   {SVG["drive"]} Abrir archivo en Google Drive
                 </a>
-                {f'<span style="font-size:0.73rem;color:#64748B">📍 Ir a <b>Pág. {pagina}</b></span>' if pagina else ''}
+                {f'<span style="font-size:0.74rem;color:#64748B">📍 Ubicación: <b>Pág. {pagina}</b></span>' if pagina else ''}
               </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # Nota de fuente
-        st.markdown(f"""
-        <div style="margin-top:14px;padding:8px 12px;background:#F8FAFC;border-radius:6px;font-size:0.78rem;color:#64748B">
-          {SVG["drive"]} <a href="{GOOGLE_DRIVE_FOLDER}" target="_blank" style="color:#1967D2;font-weight:600">Ver todos los reglamentos en Google Drive</a>
-        </div>
-        """, unsafe_allow_html=True)
+# ── BOTTOM CHAT DOCK (ESTILO CHATGPT / GEMINI OCUPANDO CASI TODO) ──────────────
+st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+
+with st.container():
+    # Prompt dock container
+    st.markdown("""
+    <div style="border-top:2px solid #F1F5F9;padding-top:16px;margin-top:16px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.9rem;font-weight:700;color:#0F172A;margin-bottom:6px">
+        Consulta del Estudiante
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    default_prompt = st.session_state.quick_q or ""
+    c_input, c_btn = st.columns([5.5, 1.5], gap="small")
+
+    with c_input:
+        student_msg = st.text_area(
+            "Consulta del estudiante",
+            value=default_prompt,
+            height=85,
+            placeholder="Escribe o pega aquí el mensaje del alumno (ej: 'Profesor, desaprobé la evaluación final y deseo solicitar reconsideración...')...",
+            label_visibility="collapsed",
+            max_chars=4000,
+        )
+
+    with c_btn:
+        st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
+        can_run = bool(api_key and student_msg.strip())
+        run_query = st.button("Resolver con IA →", use_container_width=True, type="primary", disabled=not can_run)
+        if st.session_state.history:
+            st.caption(f"Historial: {len(st.session_state.history)} consultas")
+
+    with st.expander("➕ Contexto adicional opcional (curso, ciclo, antecedentes del alumno...)"):
+        extra_ctx = st.text_input(
+            "Contexto extra",
+            placeholder="Ej: Curso Gestión de Operaciones, alumno del 8vo ciclo DPA, no asistió al examen extemporáneo...",
+            label_visibility="collapsed"
+        )
+
+    # Limpiar trigger rápido si se usó
+    if st.session_state.quick_q:
+        st.session_state.quick_q = None
+
+# ── PROCESAMIENTO DE CONSULTA ─────────────────────────────────────────────────
+if run_query and api_key and student_msg.strip():
+    with st.spinner("Buscando artículos en reglamentos y redactando dictamen con IA..."):
+        try:
+            if not is_indexed and api_key:
+                build_vector_store(api_key=api_key)
+                rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
+
+            result_data, sources_data = rag.answer_question(
+                query=student_msg.strip(),
+                context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
+                model_label=model_label,
+                chat_history=st.session_state.history,
+            )
+            st.session_state.last_result = result_data
+            st.session_state.last_sources = sources_data
+            st.session_state.history.append(student_msg.strip()[:120])
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error al procesar la consulta: {e}")

@@ -674,19 +674,24 @@ with col3:
             doc_drive_url = get_file_drive_url(doc_name, pagina)
             page_label = f" · Pág. {pagina}" if pagina else ""
 
+            badge_page = f'<span style="background:#EFF6FF;color:#1E40AF;padding:2px 8px;border-radius:12px;font-size:0.73rem;font-weight:700;border:1px solid #BFDBFE;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
+
             st.markdown(f"""
             <div class="cite-card">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
                 <span class="cite-num">{num}</span>
-                <div>
+                <div style="flex:1">
                   <div class="cite-source">{doc_name}</div>
-                  <div class="cite-section">{seccion}{page_label}</div>
+                  <div class="cite-section" style="margin-top:2px">{seccion}{badge_page}</div>
                 </div>
               </div>
               {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
-              <a href="{doc_drive_url}" target="_blank" class="drive-link">
-                {SVG["drive"]} Abrir documento en Drive {f"(Pág. {pagina})" if pagina else ""}
-              </a>
+              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+                <a href="{doc_drive_url}" target="_blank" class="drive-link">
+                  {SVG["drive"]} Abrir archivo en Google Drive
+                </a>
+                {f'<span style="font-size:0.73rem;color:#64748B">📍 Ir a <b>Pág. {pagina}</b></span>' if pagina else ''}
+              </div>
             </div>
             """, unsafe_allow_html=True)
 

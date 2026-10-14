@@ -218,13 +218,17 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         # 1. Quitar etiquetas de razonamiento <think>...</think>
         text = _re.sub(r'<think>[\s\S]*?</think>', '', text).strip()
 
-        # 2. Extraer bloque markdown ```json ... ``` si existe
-        match_codeblock = _re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
-        if match_codeblock:
-            candidate = match_codeblock.group(1).strip()
+        # 2. Extraer el contenido del bloque ```json ... ``` si existe
+        codeblock = _re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+        if codeblock:
+            candidate = codeblock.group(1).strip()
         else:
-            match_brace = _re.search(r'\{[\s\S]*\}', text)
-            candidate = match_brace.group(0).strip() if match_brace else text
+            start_b = text.find('{')
+            end_b = text.rfind('}')
+            if start_b != -1 and end_b != -1 and end_b > start_b:
+                candidate = text[start_b : end_b + 1].strip()
+            else:
+                candidate = text
 
         parsed = None
         # 3. Intento 1: json.loads con strict=False (permite saltos de línea literales)
@@ -245,25 +249,26 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             except Exception:
                 pass
 
-        # 5. Intento 3: Extracción regex de campos clave para evitar que salga el JSON crudo en el borrador
+        def _clean_str(s: str) -> str:
+            """Decodifica escapes sin alterar caracteres UTF-8 ni tildes."""
+            return s.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+
+        # 5. Intento 3: Extracción regex de campos clave conservando tildes y caracteres UTF-8
         if not parsed:
             parsed = {}
             m_draft = _re.search(r'"borrador_alumno"\s*:\s*"((?:\\.|[^"\\])*)"', candidate, _re.DOTALL)
             if m_draft:
-                try:
-                    parsed["borrador_alumno"] = m_draft.group(1).encode().decode('unicode_escape', errors='replace')
-                except Exception:
-                    parsed["borrador_alumno"] = m_draft.group(1)
+                parsed["borrador_alumno"] = _clean_str(m_draft.group(1))
             else:
                 clean_raw = _re.sub(r'^```(?:json)?\s*', '', text)
                 clean_raw = _re.sub(r'\s*```$', '', clean_raw).strip()
                 parsed["borrador_alumno"] = clean_raw
 
             m_appr = _re.search(r'"requiere_aprobacion"\s*:\s*"((?:\\.|[^"\\])*)"', candidate)
-            parsed["requiere_aprobacion"] = m_appr.group(1) if m_appr else "La coordinadora puede resolver directamente"
+            parsed["requiere_aprobacion"] = _clean_str(m_appr.group(1)) if m_appr else "La coordinadora puede resolver directamente"
 
             m_reas = _re.search(r'"razonamiento"\s*:\s*"((?:\\.|[^"\\])*)"', candidate)
-            parsed["razonamiento"] = m_reas.group(1) if m_reas else ""
+            parsed["razonamiento"] = _clean_str(m_reas.group(1)) if m_reas else ""
 
             parsed["acciones_coordinadora"] = []
             parsed["citas_normativas"] = []

@@ -186,23 +186,81 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             max_tokens=1400,
         )
 
-        raw = response.choices[0].message.content.strip()
-        # Limpiar bloque markdown si el modelo lo devuelve con ```json
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
+        raw = ""
+        try:
+            # Para OpenAI podemos forzar JSON mode directamente
+            kwargs = dict(
+                model=model_cfg["model_id"],
+                messages=messages,
+                temperature=0.15,
+                max_tokens=1400,
+            )
+            if model_cfg["provider"] == "openai":
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = client.chat.completions.create(**kwargs)
+            raw = response.choices[0].message.content.strip()
+        except Exception as api_err:
+            return {
+                "requiere_aprobacion": "Error de comunicación con la API",
+                "borrador_alumno": f"No se pudo conectar con el modelo: {api_err}",
+                "acciones_coordinadora": ["Verificar que la API Key sea válida y tenga saldo disponible."],
+                "razonamiento": str(api_err),
+                "citas_normativas": []
+            }, sources
+
+        # Limpiar bloque markdown ```json ... ``` si el modelo lo devuelve así
+        clean = raw
+        if clean.startswith("```"):
+            parts = clean.split("```")
+            clean = parts[1] if len(parts) > 1 else clean
+            if clean.startswith("json"):
+                clean = clean[4:]
+            clean = clean.strip()
+
+        # Extraer primer objeto JSON si el modelo devolvió texto antes o después
+        import re as _re
+        json_match = _re.search(r'\{[\s\S]*\}', clean)
+        if json_match:
+            clean = json_match.group(0)
 
         try:
-            parsed = json.loads(raw)
-        except Exception:
+            parsed = json.loads(clean)
+            # Asegurarse de que es un dict (no una lista, string u otro tipo)
+            if not isinstance(parsed, dict):
+                raise ValueError(f"Se esperaba un dict, se recibió {type(parsed).__name__}")
+        except Exception as parse_err:
             parsed = {
-                "requiere_aprobacion": "Ver respuesta completa",
+                "requiere_aprobacion": "Respuesta sin estructura JSON",
                 "borrador_alumno": raw,
                 "acciones_coordinadora": [],
-                "razonamiento": "El modelo no devolvió JSON válido. Se muestra la respuesta directa.",
+                "razonamiento": f"El modelo no devolvió JSON válido ({parse_err}). Respuesta mostrada tal como fue recibida.",
                 "citas_normativas": []
             }
 
+        # Normalizar citas_normativas: garantizar que cada elemento sea un dict
+        raw_citas = parsed.get("citas_normativas", [])
+        clean_citas = []
+        for idx_c, c in enumerate(raw_citas if isinstance(raw_citas, list) else [], 1):
+            if isinstance(c, dict):
+                clean_citas.append(c)
+            else:
+                # Si por algún error el modelo devolvió una cadena, convertirla
+                clean_citas.append({
+                    "numero": idx_c,
+                    "documento": str(c),
+                    "seccion": "",
+                    "pagina": "",
+                    "extracto": ""
+                })
+        parsed["citas_normativas"] = clean_citas
+
+        # Normalizar acciones_coordinadora como lista de strings
+        raw_acc = parsed.get("acciones_coordinadora", [])
+        if isinstance(raw_acc, str):
+            parsed["acciones_coordinadora"] = [raw_acc]
+        elif not isinstance(raw_acc, list):
+            parsed["acciones_coordinadora"] = []
+
         return parsed, sources
+

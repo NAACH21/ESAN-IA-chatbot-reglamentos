@@ -380,10 +380,17 @@ with col1:
         max_chars=2000,
     )
 
+    # Diagnostics: show exactly why the button might be disabled
+    can_resolve = bool(api_key and student_msg.strip())
+    if not api_key:
+        st.warning("Ingresa tu OpenAI API Key en la barra lateral.", icon="🔑")
+    elif not student_msg.strip():
+        st.info("Escribe el mensaje del alumno para habilitar la consulta.", icon="✏️")
+
     resolve_btn = st.button(
         "Resolver consulta",
         use_container_width=True,
-        disabled=not (api_key and is_indexed and student_msg.strip()),
+        disabled=not can_resolve,
         type="primary",
     )
 
@@ -396,26 +403,34 @@ with col1:
 
 # ═══════════════════════════════════════════════════════════ PROCESS ══════════
 if resolve_btn and api_key and student_msg.strip():
-    with st.spinner("Analizando normativa y generando respuesta..."):
-        try:
-            result, sources = rag.answer_question(
-                query=student_msg.strip(),
-                context_extra=extra_ctx.strip(),
-                model_label=model_label,
-                chat_history=st.session_state.history,
-            )
-            st.session_state.last_result = result
-            st.session_state.last_sources = sources
-            st.session_state.history.append(student_msg.strip()[:120])
-        except Exception as e:
-            st.session_state.last_result = {
-                "requiere_aprobacion": "Error",
-                "borrador_alumno": f"Error al procesar: {e}",
-                "acciones_coordinadora": [],
-                "razonamiento": str(e),
-                "citas_normativas": [],
-            }
-            st.session_state.last_sources = []
+    # Spinner visible en columna 2 para que el usuario vea el progreso
+    with col2:
+        with st.spinner("Analizando normativa y generando respuesta..."):
+            try:
+                # Si la BD no está indexada, indexar automáticamente primero
+                if not is_indexed and api_key:
+                    build_vector_store(api_key=api_key)
+                    rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
+
+                result, sources = rag.answer_question(
+                    query=student_msg.strip(),
+                    context_extra=extra_ctx.strip(),
+                    model_label=model_label,
+                    chat_history=st.session_state.history,
+                )
+                st.session_state.last_result = result
+                st.session_state.last_sources = sources
+                st.session_state.history.append(student_msg.strip()[:120])
+            except Exception as e:
+                st.session_state.last_result = {
+                    "requiere_aprobacion": "Error al procesar",
+                    "borrador_alumno": f"Error: {e}",
+                    "acciones_coordinadora": [],
+                    "razonamiento": str(e),
+                    "citas_normativas": [],
+                }
+                st.session_state.last_sources = []
+    st.rerun()
 
 # ═══════════════════════════════════════════════════════════ COLUMNA 02 ═══════
 with col2:

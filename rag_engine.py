@@ -37,8 +37,8 @@ Ayudas a las coordinadoras académicas a resolver consultas y trámites de estud
 Responde SIEMPRE en formato JSON estricto con las siguientes claves (sin texto adicional fuera del JSON):
 {
   "requiere_aprobacion": "string — instancia competente que debe resolver o validar (ej: 'Dirección del Programa', 'Secretaría Académica', 'Comité Académico', 'Dirección de Posgrado / Educación Ejecutiva', 'La coordinadora puede resolver directamente')",
-  "borrador_alumno": "string — mensaje empático, formal y claro listo para enviar al estudiante. Incluye referencias numéricas entre corchetes [1], [2] para cada cita normativa usada. Firma con 'Coordinación Académica - Universidad ESAN'.",
-  "acciones_coordinadora": ["lista de strings — acciones concretas de validación, registro en intranet, verificación de actas o gestión del expediente del alumno"],
+  "borrador_alumno": "string — respuesta completa, estructurada y pedagógica lista para enviar al estudiante. Debe incluir: 1) Saludo formal y diagnóstico de la consulta; 2) Fundamentación normativa con referencias [1], [2]; 3) Requisitos obligatorios y documentación; 4) Procedimiento paso a paso con plazos precisos; 5) Despedida firmada con 'Coordinación Académica - Universidad ESAN'. Evita respuestas telegráficas o de 2 líneas; desarrolla la explicación con claridad procedimental.",
+  "acciones_coordinadora": ["lista de strings — acciones concretas de validación, verificación en sistema, revisión de actas o gestiones que debe ejecutar la coordinadora"],
   "razonamiento": "string — fundamentación técnica de las reglas normativas aplicadas y reglamentos considerados",
   "citas_normativas": [
     {
@@ -53,6 +53,7 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves (sin texto a
 
 REGLAS ABSOLUTAS:
 - No inventes artículos, plazos ni requisitos. Solo usa lo que esté en los fragmentos normativos provistos.
+- Redacta el borrador para el alumno de manera EXPLICATIVA y DETALLADA, guiándolo paso a paso para que entienda exactamente los requisitos, canales y plazos de su trámite. No te limites a respuestas breves o superficiales.
 - Identifica correctamente el tipo de programa o instancia institucional (Posgrado, Educación Ejecutiva, PEE, Maestrías o según corresponda al reglamento citado). Nunca asumas 'Pregrado' a menos que el documento o la consulta lo especifiquen expresamente.
 - Si la consulta requiere una validación excepcional no prevista en la normativa, indica en 'borrador_alumno' que el caso será elevado en consulta formal y en 'requiere_aprobacion' asigna 'Dirección Académica / Dirección del Programa (caso no previsto en normativa)'.
 - Prioriza siempre la normativa y tarifarios más recientes ante versiones anteriores.
@@ -193,7 +194,7 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 model=model_cfg["model_id"],
                 messages=messages,
                 temperature=0.15,
-                max_tokens=1400,
+                max_tokens=2000,
                 response_format={"type": "json_object"},
             )
             try:

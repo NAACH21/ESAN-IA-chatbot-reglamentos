@@ -39,17 +39,20 @@ from drive_sync import (
 load_dotenv()
 
 # ── CARGA SILENCIOSA DE CREDENCIALES (Sin mostrar en la interfaz) ───────────────
-api_key = os.getenv("OPENAI_API_KEY", "")
+api_key = os.getenv("OPENAI_API_KEY", "") or os.getenv("openai_api_key", "")
 try:
-    api_key = api_key or st.secrets.get("OPENAI_API_KEY", "")
+    if not api_key and hasattr(st, "secrets"):
+        api_key = st.secrets.get("OPENAI_API_KEY", "") or st.secrets.get("openai_api_key", "") or ""
 except Exception:
     pass
 
-or_key = os.getenv("OPENROUTER_API_KEY", "")
+or_key = os.getenv("OPENROUTER_API_KEY", "") or os.getenv("openrouter_api_key", "") or os.getenv("MIMO_API_KEY", "") or ""
 try:
-    or_key = or_key or st.secrets.get("OPENROUTER_API_KEY", "")
+    if not or_key and hasattr(st, "secrets"):
+        or_key = st.secrets.get("OPENROUTER_API_KEY", "") or st.secrets.get("openrouter_api_key", "") or st.secrets.get("MIMO_API_KEY", "") or ""
 except Exception:
     pass
+
 
 # ── CARGA DE LOGO OFICIAL SVG EN BASE64 ───────────────────────────────────────
 def get_esan_logo_base64():
@@ -399,7 +402,17 @@ with st.sidebar:
     if api_key:
         st.markdown(f'<div class="status-pill-ok">{SVG["check"]} Conexión reglamentaria activa</div>', unsafe_allow_html=True)
     else:
-        st.warning("Credenciales OPENAI_API_KEY no detectadas en .env")
+        st.markdown(f"""
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;margin:8px 0">
+          <div style="font-weight:700;font-size:0.82rem;color:#92400E;display:flex;align-items:center;gap:6px">
+            {SVG['alert']} Claves no configuradas
+          </div>
+          <div style="font-size:0.75rem;color:#78350F;margin-top:4px;line-height:1.4">
+            En Streamlit Cloud ve a <b>Settings &gt; Secrets</b> y agrega:<br>
+            <code style="display:block;margin-top:4px;padding:3px;background:#FEF3C7;border-radius:4px;font-size:0.72rem">OPENAI_API_KEY = "tu_key"</code>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -430,6 +443,13 @@ with st.sidebar:
         st.markdown(f'<div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;margin-bottom:8px">{SVG["book"]} <b>{cnt:,}</b> secciones normativas indexadas</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div style="font-size:0.8rem;color:#B45309;display:flex;align-items:center;gap:6px;margin-bottom:8px">{SVG["alert"]} Repositorio pendiente de inicialización</div>', unsafe_allow_html=True)
+        if api_key and os.path.exists(DOCS_FOLDER):
+            if st.button("Indexar los 43 reglamentos ahora", type="primary", use_container_width=True, key="btn_init_index"):
+                with st.spinner("Indexando los 43 reglamentos..."):
+                    res = index_missing_documents(api_key=api_key)
+                    st.success("¡Reglamentos indexados exitosamente!")
+                    st.rerun()
+
 
     # 3. SINCRONIZACIÓN CON GOOGLE DRIVE
     with st.expander("Sincronizar Google Drive"):

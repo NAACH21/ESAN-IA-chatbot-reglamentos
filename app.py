@@ -1,5 +1,6 @@
 import os
 import sys
+import base64
 import importlib
 import streamlit as st
 from dotenv import load_dotenv
@@ -50,74 +51,134 @@ try:
 except Exception:
     pass
 
+# ── CARGA DE LOGO OFICIAL SVG EN BASE64 ───────────────────────────────────────
+def get_esan_logo_base64():
+    try:
+        p = os.path.join(os.path.dirname(__file__), "assets", "logo_esan.svg")
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        pass
+    return ""
+
+ESAN_LOGO_B64 = get_esan_logo_base64()
+
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Asistente de Coordinación · Universidad ESAN",
+    page_title="Sistema Normativo · Universidad ESAN",
     page_icon="https://cdn.worldvectorlogo.com/logos/universidad-esan.svg",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── SVG ICONS EN ROJO ESAN Y NEUTROS ─────────────────────────────────────────
+# ── SVG ICONS INSTITUCIONALES (CERO EMOJIS) ───────────────────────────────────
 SVG = {
-    "brain": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"/></svg>""",
-    "db": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>""",
+    "scale": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>""",
+    "db": """<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>""",
+    "book": """<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>""",
     "file": """<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>""",
     "check": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>""",
+    "shield_check": """<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>""",
     "drive": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1967D2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h6l2 3h1a2 2 0 0 1 2 2z"/></svg>""",
-    "sparkles": """<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>""",
-    "send": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>""",
+    "pin": """<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>""",
+    "chip": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>""",
+    "alert": """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>""",
+    "search": """<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>""",
+    "clipboard_check": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>""",
+    "grad_cap": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>""",
+    "sparkles": """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D31418" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>""",
 }
 
-# ── STYLING INSTITUCIONAL ESAN (ROJO INSTITUCIONAL #D31418) ──────────────────
+# ── STYLING INSTITUCIONAL ESAN ────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Tipografía y fondo principal */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Header Institucional */
-.esan-header {
+/* Navbar Institucional Superior */
+.esan-navbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px;
+    padding: 14px 22px;
     background: #FFFFFF;
-    border: 1px solid #F1F5F9;
-    border-left: 5px solid #D31418;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    border: 1px solid #E2E8F0;
+    border-top: 3.5px solid #D31418;
+    border-radius: 10px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
 }
-.esan-title {
-    font-size: 1.35rem;
+.esan-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.esan-nav-logo {
+    height: 38px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+.esan-nav-divider {
+    width: 1px;
+    height: 32px;
+    background: #E2E8F0;
+}
+.esan-nav-title {
+    font-size: 1.05rem;
     font-weight: 800;
     color: #0F172A;
-    line-height: 1.2;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
 }
-.esan-title span {
-    color: #D31418;
-}
-.esan-subtitle {
-    font-size: 0.85rem;
+.esan-nav-subtitle {
+    font-size: 0.78rem;
     color: #64748B;
     margin-top: 2px;
+    font-weight: 500;
+}
+.esan-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.esan-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+.pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #16A34A;
+    display: inline-block;
+}
+.status-text {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #334155;
 }
 
 /* Tarjetas y Contenedores */
 .esan-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-radius: 12px;
+    border-radius: 10px;
     padding: 18px 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.02);
     margin-bottom: 16px;
 }
 .esan-card-title {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #0F172A;
     display: flex;
@@ -135,20 +196,19 @@ html, body, [class*="css"] {
     gap: 12px;
     background: #FFFBEB;
     border: 1px solid #FDE68A;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 12px 16px;
     margin-bottom: 14px;
 }
 .appr-icon {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background: #FEF3C7;
     border: 1px solid #F59E0B;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
     flex-shrink: 0;
 }
 
@@ -156,7 +216,7 @@ html, body, [class*="css"] {
 .draft-box {
     background: #FAFAFA;
     border: 1px solid #E2E8F0;
-    border-left: 4px solid #D31418;
+    border-left: 3.5px solid #D31418;
     border-radius: 8px;
     padding: 16px;
     font-size: 0.92rem;
@@ -170,17 +230,17 @@ html, body, [class*="css"] {
 .cite-card {
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-left: 4px solid #D31418;
+    border-left: 3.5px solid #D31418;
     border-radius: 8px;
     padding: 12px 14px;
     margin-bottom: 12px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
 }
 .cite-card:hover {
     border-color: #FECACA;
     border-left-color: #D31418;
-    box-shadow: 0 4px 12px rgba(211,20,24,0.06);
+    box-shadow: 0 3px 10px rgba(211,20,24,0.05);
 }
 .cite-num {
     display: inline-flex;
@@ -223,7 +283,7 @@ html, body, [class*="css"] {
     gap: 4px;
     color: #1967D2;
     text-decoration: none;
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 600;
     padding: 4px 8px;
     background: #F0F7FF;
@@ -250,23 +310,20 @@ html, body, [class*="css"] {
 /* Welcome Hero Cards */
 .hero-box {
     text-align: center;
-    padding: 30px 20px 20px 20px;
+    padding: 24px 20px 18px 20px;
 }
-.welcome-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    margin-top: 20px;
+.hero-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #0F172A;
+    margin-bottom: 6px;
 }
-
-/* Bottom Chat Dock (Estilo ChatGPT / Gemini) */
-.chat-dock {
-    background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-radius: 16px;
-    padding: 14px 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    margin-top: 20px;
+.hero-desc {
+    font-size: 0.9rem;
+    color: #64748B;
+    max-width: 680px;
+    margin: 0 auto;
+    line-height: 1.5;
 }
 
 /* Botón primario en Rojo ESAN */
@@ -275,13 +332,13 @@ button[kind="primary"] {
     border-color: #D31418 !important;
     color: #FFFFFF !important;
     font-weight: 700 !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
     transition: all 0.2s ease !important;
 }
 button[kind="primary"]:hover {
     background-color: #B20D10 !important;
     border-color: #B20D10 !important;
-    box-shadow: 0 4px 12px rgba(211,20,24,0.25) !important;
+    box-shadow: 0 4px 12px rgba(211,20,24,0.22) !important;
 }
 
 /* Status pills */
@@ -293,7 +350,7 @@ button[kind="primary"]:hover {
     border: 1px solid #BBF7D0;
     color: #166534;
     padding: 4px 10px;
-    border-radius: 20px;
+    border-radius: 6px;
     font-size: 0.78rem;
     font-weight: 600;
 }
@@ -305,12 +362,12 @@ button[kind="primary"]:hover {
     border: 1px solid #FECACA;
     color: #991B1B;
     padding: 4px 10px;
-    border-radius: 20px;
+    border-radius: 6px;
     font-size: 0.78rem;
     font-weight: 700;
 }
 .sb-section {
-    font-size: 0.86rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: #0F172A;
     margin: 14px 0 8px 0;
@@ -332,49 +389,47 @@ for key, default in [
 
 # ── SIDEBAR (ELECCIÓN DE MODELOS, BASE DOCUMENTAL, SYNC DRIVE) ─────────────────
 with st.sidebar:
-    # Logo oficial actual de ESAN
-    if os.path.exists("assets/logo_esan.svg"):
-        st.image("assets/logo_esan.svg", width=190)
+    if ESAN_LOGO_B64:
+        st.markdown(f'<img src="data:image/svg+xml;base64,{ESAN_LOGO_B64}" width="180" style="margin-bottom:8px" />', unsafe_allow_html=True)
     else:
-        st.markdown('<h2 style="color:#D31418;margin:0">UNIVERSIDAD ESAN</h2>', unsafe_allow_html=True)
+        st.markdown('<h3 style="color:#D31418;margin:0">UNIVERSIDAD ESAN</h3>', unsafe_allow_html=True)
 
-    st.caption("Coordinación Académica · Soporte Normativo")
+    st.caption("Coordinación Académica · Marco Normativo")
 
-    # Indicador silencioso de credenciales conectadas
     if api_key:
-        st.markdown('<div class="status-pill-ok">● Motor IA activo (.env)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="status-pill-ok">{SVG["check"]} Conexión reglamentaria activa</div>', unsafe_allow_html=True)
     else:
-        st.warning("Configura tu OPENAI_API_KEY en el archivo .env", icon="🔑")
+        st.warning("Credenciales OPENAI_API_KEY no detectadas en .env")
 
     st.markdown("---")
 
-    # 1. SELECCIÓN DE MODELO (Movido aquí a la izquierda como pidió el usuario)
-    st.markdown(f'<div class="sb-section">{SVG["brain"]} Modelo de Inteligencia Artificial</div>', unsafe_allow_html=True)
+    # 1. SELECCIÓN DE MODELO
+    st.markdown(f'<div class="sb-section">{SVG["chip"]} Motor de Dictamen</div>', unsafe_allow_html=True)
     model_label = st.radio(
         "Seleccionar Modelo",
         options=list(MODELS.keys()),
         index=0,
         label_visibility="collapsed",
-        help="Elige el modelo según la complejidad de la consulta normativa."
+        help="Seleccione el modelo según la complejidad del dictamen normativo."
     )
     model_cfg = MODELS[model_label]
     if model_cfg["provider"] == "openai":
-        st.markdown('<div class="status-pill-model">⚡ OpenAI · GPT-4o-mini (Rápido y económico)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="status-pill-model">{SVG["check"]} OpenAI · GPT-4o-mini (Estándar)</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="status-pill-model">🧠 OpenRouter · MiMo v2.6 Pro (Razonamiento profundo)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="status-pill-model">{SVG["check"]} OpenRouter · MiMo v2.6 Pro (Razonamiento)</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
     # 2. BASE DOCUMENTAL
-    st.markdown(f'<div class="sb-section">{SVG["db"]} Base Documental</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sb-section">{SVG["db"]} Repositorio Normativo</div>', unsafe_allow_html=True)
     rag = RAGEngine(api_key=api_key, openrouter_key=or_key) if api_key else None
     is_indexed = rag.is_indexed() if rag else False
 
     if is_indexed:
         cnt = rag.get_document_count()
-        st.caption(f"📚 **{cnt:,}** secciones vectorizadas en ChromaDB")
+        st.markdown(f'<div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;margin-bottom:8px">{SVG["book"]} <b>{cnt:,}</b> secciones normativas indexadas</div>', unsafe_allow_html=True)
     else:
-        st.caption("⚠️ Base documental sin inicializar")
+        st.markdown(f'<div style="font-size:0.8rem;color:#B45309;display:flex;align-items:center;gap:6px;margin-bottom:8px">{SVG["alert"]} Repositorio pendiente de inicialización</div>', unsafe_allow_html=True)
 
     # 3. SINCRONIZACIÓN CON GOOGLE DRIVE
     with st.expander("Sincronizar Google Drive"):
@@ -421,12 +476,12 @@ with st.sidebar:
                 with c1:
                     st.markdown(f"{SVG['file']}<small style='word-break:break-all'>{sub_rel}</small>", unsafe_allow_html=True)
                 with c2:
-                    if st.button("✕", key=f"del_{i_d}", help=f"Quitar {d}"):
+                    if st.button("Quitar", key=f"del_{i_d}", help=f"Quitar {d}"):
                         n_rm = remove_document_from_store(d)
                         st.toast(f"'{d}' eliminado ({n_rm} secciones)")
                         st.rerun()
 
-            if st.button("Indexar documentos nuevos locales", use_container_width=True, disabled=not bool(api_key)):
+            if st.button("Indexar documentos nuevos", use_container_width=True, disabled=not bool(api_key)):
                 with st.spinner("Indexando..."):
                     res = index_missing_documents(api_key=api_key)
                     st.info(res["message"])
@@ -440,21 +495,26 @@ with st.sidebar:
         st.session_state.last_sources = []
         st.rerun()
 
-# ── TOP HEADER INSTITUCIONAL ──────────────────────────────────────────────────
+# ── TOP NAVBAR INSTITUCIONAL REIMAGINADO (SIN FORMATO IA DE JUGUETE) ─────────
+logo_html = f'<img src="data:image/svg+xml;base64,{ESAN_LOGO_B64}" alt="Universidad ESAN" class="esan-nav-logo" />' if ESAN_LOGO_B64 else '<div style="font-weight:900;color:#D31418;font-size:1.15rem">ESAN</div>'
+
 st.markdown(f"""
-<div class="esan-header">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div style="width:40px;height:40px;border-radius:8px;background:#D31418;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.1rem">
-      E
-    </div>
+<div class="esan-navbar">
+  <div class="esan-nav-left">
+    {logo_html}
+    <div class="esan-nav-divider"></div>
     <div>
-      <div class="esan-title">Asistente Normativo de Coordinación · <span>ESAN</span></div>
-      <div class="esan-subtitle">Respuestas institucionales oficiales con citas y respaldo reglamentario verificado</div>
+      <div class="esan-nav-title">SISTEMA INSTITUCIONAL DE CONSULTA Y GESTIÓN NORMATIVA</div>
+      <div class="esan-nav-subtitle">Coordinación Académica · Marco Reglamentario Vigente</div>
     </div>
   </div>
-  <div>
+  <div class="esan-nav-right">
+    <div class="esan-status-indicator">
+      <span class="pulse-dot"></span>
+      <span class="status-text">Repositorio Vigente · 43 Reglamentos</span>
+    </div>
     <div class="status-pill-model">
-      {model_label.split('(')[0].strip()}
+      {SVG["shield_check"]} Verificación Oficial
     </div>
   </div>
 </div>
@@ -465,34 +525,72 @@ result = st.session_state.last_result
 sources = st.session_state.last_sources
 
 if result is None:
-    # Pantalla de Bienvenida con tarjetas sugeridas estilo Gemini/GPT
+    # Pantalla Institucional de Casos Frecuentes
     st.markdown("""
     <div class="hero-box">
-      <div style="font-size:1.6rem;font-weight:800;color:#0F172A;margin-bottom:6px">
-        ¿En qué consulta de coordinación académica te puedo ayudar hoy?
-      </div>
-      <div style="font-size:0.92rem;color:#64748B;max-width:680px;margin:0 auto">
-        Escribe la consulta del estudiante en la barra inferior o haz clic en alguno de los casos frecuentes para redactar una respuesta normativa inmediata.
+      <div class="hero-title">Consultas Reglamentarias y Casuística Estudiantil</div>
+      <div class="hero-desc">
+        Seleccione un tipo de consulta frecuente o ingrese la solicitud del estudiante en el panel inferior para obtener la fundamentación reglamentaria, instancia resolutiva y propuesta de respuesta.
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     c_c1, c_c2 = st.columns(2)
     with c_c1:
-        if st.button("📝 Reconsideración de Nota\n\n¿Cuándo y ante quién puede solicitar reconsideración de evaluación?", use_container_width=True):
+        st.markdown(f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
+            {SVG['scale']} Reconsideración de Evaluaciones
+          </div>
+          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
+            Plazos reglamentarios, requisitos formales e instancia resolutiva ante reclamos de calificación.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Consultar plazos y trámite de reconsideración →", key="q_recons", use_container_width=True):
             st.session_state.quick_q = "¿Cuándo puedo pedir reconsideración de nota y ante qué autoridad corresponde presentarla?"
             st.rerun()
 
-        if st.button("🤖 Uso de Inteligencia Artificial\n\n¿Cuáles son los lineamientos para docentes y alumnos sobre uso de IA?", use_container_width=True):
+        st.markdown(f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin:14px 0 10px 0">
+          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
+            {SVG['chip']} Lineamientos de Inteligencia Artificial
+          </div>
+          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
+            Disposiciones institucionales para docentes y alumnos sobre el uso de herramientas IA en evaluaciones.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Consultar directiva sobre uso de IA →", key="q_ia", use_container_width=True):
             st.session_state.quick_q = "¿Cuáles son los lineamientos sobre el uso de Inteligencia Artificial para docentes y alumnos en ESAN?"
             st.rerun()
 
     with c_c2:
-        if st.button("🎓 Requisitos de Grado de Bachiller\n\n¿Cuáles son los requisitos reglamentarios para obtener el grado?", use_container_width=True):
+        st.markdown(f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
+            {SVG['grad_cap']} Requisitos para Grado de Bachiller
+          </div>
+          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
+            Cómputo de créditos académicos, acreditación obligatoria de idiomas y condiciones de graduación.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Consultar requisitos de bachillerato →", key="q_bach", use_container_width=True):
             st.session_state.quick_q = "¿Cuáles son los requisitos y créditos necesarios para obtener el Grado de Bachiller?"
             st.rerun()
 
-        if st.button("💰 Devolución de Dinero y Retiro\n\n¿Cuál es el procedimiento y formato para devoluciones o retiro de programa?", use_container_width=True):
+        st.markdown(f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin:14px 0 10px 0">
+          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
+            {SVG['book']} Procedimiento de Devolución y Retiro
+          </div>
+          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
+            Plazos de desistimiento, cronograma de retenciones y trámite formal de retiro de programa.
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Consultar política de devoluciones y retiros →", key="q_ret", use_container_width=True):
             st.session_state.quick_q = "¿Cuál es el procedimiento formal y plazos para solicitar devolución de dinero o retiro de programa?"
             st.rerun()
 
@@ -502,15 +600,15 @@ else:
 
     # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
     with col_resp:
-        st.markdown(f'<div class="esan-card-title">{SVG["sparkles"]} Respuesta propuesta para Coordinación</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="esan-card-title">{SVG["scale"]} Dictamen y Propuesta de Respuesta para Coordinación</div>', unsafe_allow_html=True)
 
         # 1. Badge de Aprobación
         appr = result.get("requiere_aprobacion", "La coordinadora puede resolver directamente")
         st.markdown(f"""
         <div class="appr-badge">
-          <div class="appr-icon">👤</div>
+          <div class="appr-icon">{SVG['shield_check']}</div>
           <div>
-            <div style="font-weight:700;font-size:0.86rem;color:#78350F">Requiere aprobación / validación de:</div>
+            <div style="font-weight:700;font-size:0.85rem;color:#78350F">Instancia competente / Validación requerida:</div>
             <div style="font-size:0.9rem;color:#92400E;font-weight:600;margin-top:2px">{appr}</div>
           </div>
         </div>
@@ -518,39 +616,39 @@ else:
 
         # 2. Borrador para el Alumno
         draft = result.get("borrador_alumno", "")
-        st.markdown("<b style='font-size:0.88rem;color:#0F172A'>Borrador de respuesta para el estudiante</b>", unsafe_allow_html=True)
+        st.markdown("<b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante</b>", unsafe_allow_html=True)
         st.markdown(f'<div class="draft-box">{draft}</div>', unsafe_allow_html=True)
 
         # 3. Botones de Copia Rápidos
         b_c1, b_c2 = st.columns(2)
-        wa_text = f"📱 *Coordinación Académica ESAN*\n\n{draft}"
+        wa_text = f"*Coordinación Académica ESAN*\n\n{draft}"
         mail_text = f"Estimado/a estudiante,\n\n{draft}"
 
         with b_c1:
-            if st.button("Copiar para WhatsApp", key="btn_cp_wa", use_container_width=True):
+            if st.button("Copiar formato WhatsApp", key="btn_cp_wa", use_container_width=True):
                 st.code(wa_text, language=None)
                 st.toast("Texto preparado para WhatsApp — cópialo del recuadro")
         with b_c2:
-            if st.button("Copiar para Correo", key="btn_cp_mail", use_container_width=True):
+            if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True):
                 st.code(mail_text, language=None)
                 st.toast("Texto preparado para Correo — cópialo del recuadro")
 
         # 4. Acciones para la Coordinadora
         actions = result.get("acciones_coordinadora", [])
         if actions:
-            st.markdown("<b style='font-size:0.88rem;color:#0F172A;margin-top:14px;display:block'>Acciones a verificar por la Coordinadora</b>", unsafe_allow_html=True)
+            st.markdown(f"<b style='font-size:0.88rem;color:#0F172A;margin-top:14px;display:flex;align-items:center;gap:6px'>{SVG['clipboard_check']} Protocolo de verificación para la Coordinadora</b>", unsafe_allow_html=True)
             for act in actions:
                 st.checkbox(act, value=False, key=f"chk_{hash(act)}")
 
         # 5. Razonamiento
         reason = result.get("razonamiento", "")
         if reason:
-            with st.expander("Ver razonamiento normativo del asistente"):
+            with st.expander("Fundamentación y razonamiento normativo"):
                 st.markdown(f'<div class="reason-box">{reason}</div>', unsafe_allow_html=True)
 
     # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
     with col_norm:
-        st.markdown(f'<div class="esan-card-title">{SVG["db"]} Respaldo Normativo y Citas ({len(sources)} fuentes)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="esan-card-title">{SVG["book"]} Respaldo Normativo y Citas ({len(sources)} fuentes)</div>', unsafe_allow_html=True)
 
         citas = result.get("citas_normativas", [])
         displayed = {}
@@ -575,7 +673,7 @@ else:
             extracto = c.get("extracto", "")
 
             doc_drive_url = get_file_drive_url(doc_name, pagina)
-            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:12px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
+            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
 
             st.markdown(f"""
             <div class="cite-card">
@@ -591,20 +689,19 @@ else:
                 <a href="{doc_drive_url}" target="_blank" class="drive-link">
                   {SVG["drive"]} Abrir archivo en Google Drive
                 </a>
-                {f'<span style="font-size:0.74rem;color:#64748B">📍 Ubicación: <b>Pág. {pagina}</b></span>' if pagina else ''}
+                {f'<span style="font-size:0.74rem;color:#64748B;display:inline-flex;align-items:center;gap:4px">{SVG["pin"]} Ubicación: <b>Pág. {pagina}</b></span>' if pagina else ''}
               </div>
             </div>
             """, unsafe_allow_html=True)
 
-# ── BOTTOM CHAT DOCK (ESTILO CHATGPT / GEMINI OCUPANDO CASI TODO) ──────────────
-st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+# ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
+st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
 with st.container():
-    # Prompt dock container
-    st.markdown("""
-    <div style="border-top:2px solid #F1F5F9;padding-top:16px;margin-top:16px">
-      <div style="display:flex;align-items:center;gap:6px;font-size:0.9rem;font-weight:700;color:#0F172A;margin-bottom:6px">
-        Consulta del Estudiante
+    st.markdown(f"""
+    <div style="border-top:2px solid #F1F5F9;padding-top:14px;margin-top:10px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.88rem;font-weight:700;color:#0F172A;margin-bottom:6px">
+        {SVG["search"]} Consulta o Caso del Estudiante
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -617,7 +714,7 @@ with st.container():
             "Consulta del estudiante",
             value=default_prompt,
             height=85,
-            placeholder="Escribe o pega aquí el mensaje del alumno (ej: 'Profesor, desaprobé la evaluación final y deseo solicitar reconsideración...')...",
+            placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
             label_visibility="collapsed",
             max_chars=4000,
         )
@@ -625,24 +722,23 @@ with st.container():
     with c_btn:
         st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
         can_run = bool(api_key and student_msg.strip())
-        run_query = st.button("Resolver con IA →", use_container_width=True, type="primary", disabled=not can_run)
+        run_query = st.button("Emitir Dictamen →", use_container_width=True, type="primary", disabled=not can_run)
         if st.session_state.history:
             st.caption(f"Historial: {len(st.session_state.history)} consultas")
 
-    with st.expander("➕ Contexto adicional opcional (curso, ciclo, antecedentes del alumno...)"):
+    with st.expander("Parámetros opcionales del caso (programa, ciclo, antecedentes del alumno)"):
         extra_ctx = st.text_input(
             "Contexto extra",
-            placeholder="Ej: Curso Gestión de Operaciones, alumno del 8vo ciclo DPA, no asistió al examen extemporáneo...",
+            placeholder="Ej: Programa DPA, ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
             label_visibility="collapsed"
         )
 
-    # Limpiar trigger rápido si se usó
     if st.session_state.quick_q:
         st.session_state.quick_q = None
 
 # ── PROCESAMIENTO DE CONSULTA ─────────────────────────────────────────────────
 if run_query and api_key and student_msg.strip():
-    with st.spinner("Buscando artículos en reglamentos y redactando dictamen con IA..."):
+    with st.spinner("Buscando artículos en reglamentos y redactando dictamen institucional..."):
         try:
             if not is_indexed and api_key:
                 build_vector_store(api_key=api_key)

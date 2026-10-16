@@ -620,26 +620,64 @@ else:
 
     # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
     with col_resp:
-        st.markdown(f'<div class="esan-card-title">{SVG["scale"]} Dictamen y Propuesta de Respuesta para Coordinación</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="esan-card-title">{SVG["scale"]} Dictamen Técnico y Validación para Coordinación</div>', unsafe_allow_html=True)
 
-        # 1. Badge de Aprobación
+        # 1. DICTAMEN EJECUTIVO Y PROCEDENCIA (RESPUESTA PRINCIPAL PARA LA COORDINADORA)
+        dictamen = result.get("dictamen_coordinacion", {})
+        procedencia = dictamen.get("procedencia", "Evaluación de Coordinación Académica")
+        resumen_ejecutivo = dictamen.get("resumen_ejecutivo", "") or result.get("razonamiento", "")
         appr = result.get("requiere_aprobacion", "La coordinadora puede resolver directamente")
+
+        # Estilo de badge según procedencia
+        proc_lower = procedencia.lower()
+        if "no procede" in proc_lower:
+            badge_bg, badge_border, badge_text = "#FEF2F2", "#FECACA", "#991B1B"
+            icon_badge = SVG["alert"]
+        elif "no contemplado" in proc_lower or "elevación" in proc_lower:
+            badge_bg, badge_border, badge_text = "#FFFBEB", "#FDE68A", "#92400E"
+            icon_badge = SVG["alert"]
+        else:
+            badge_bg, badge_border, badge_text = "#F0FDF4", "#BBF7D0", "#166534"
+            icon_badge = SVG["check"]
+
         st.markdown(f"""
-        <div class="appr-badge">
-          <div class="appr-icon">{SVG['shield_check']}</div>
-          <div>
-            <div style="font-weight:700;font-size:0.85rem;color:#78350F">Instancia competente / Validación requerida:</div>
-            <div style="font-size:0.9rem;color:#92400E;font-weight:600;margin-top:2px">{appr}</div>
+        <div style="background:{badge_bg};border:1.5px solid {badge_border};border-radius:8px;padding:12px 16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-weight:800;font-size:0.88rem;color:{badge_text};text-transform:uppercase;letter-spacing:0.02em">
+              {icon_badge} {procedencia}
+            </span>
+          </div>
+          <div style="font-size:0.86rem;color:#1E293B;line-height:1.5;margin-bottom:8px">
+            <b>Criterio resolutivo:</b> {resumen_ejecutivo}
+          </div>
+          <div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px">
+            {SVG['shield_check']} <span><b>Instancia competente:</b> {appr}</span>
           </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # 2. Borrador para el Alumno
+        # 2. PROTOCOLO DE VERIFICACIÓN PARA LA COORDINADORA (PROMINENTE)
+        actions = result.get("acciones_coordinadora", [])
+        if actions:
+            st.markdown(f"<div style='margin:14px 0 6px 0;display:flex;align-items:center;gap:6px;'><b style='font-size:0.88rem;color:#0F172A'>{SVG['clipboard_check']} Protocolo de verificación en sistema y expediente</b></div>", unsafe_allow_html=True)
+            for act in actions:
+                st.checkbox(act, value=False, key=f"chk_{hash(act)}")
+
+        # 3. FUNDAMENTACIÓN TÉCNICA
+        reason = result.get("razonamiento", "")
+        if reason:
+            with st.expander("Ver fundamentación y razonamiento normativo"):
+                st.markdown(f'<div class="reason-box">{reason}</div>', unsafe_allow_html=True)
+
+        st.markdown("<hr style='margin:16px 0'>", unsafe_allow_html=True)
+
+        # 4. BORRADOR DE COMUNICACIÓN PARA EL ESTUDIANTE (POST-VALIDACIÓN)
+        st.markdown("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px'><b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante (Post-validación)</b></div>", unsafe_allow_html=True)
+
         draft = result.get("borrador_alumno", "")
-        st.markdown("<b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante</b>", unsafe_allow_html=True)
         st.markdown(f'<div class="draft-box">{draft}</div>', unsafe_allow_html=True)
 
-        # 3. Botones de Copia Rápidos
+        # Botones de Copia Rápidos
         b_c1, b_c2 = st.columns(2)
         wa_text = f"*Coordinación Académica ESAN*\n\n{draft}"
         mail_text = f"Estimado/a estudiante,\n\n{draft}"
@@ -652,19 +690,6 @@ else:
             if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True):
                 st.code(mail_text, language=None)
                 st.toast("Texto preparado para Correo — cópialo del recuadro")
-
-        # 4. Acciones para la Coordinadora
-        actions = result.get("acciones_coordinadora", [])
-        if actions:
-            st.markdown(f"<b style='font-size:0.88rem;color:#0F172A;margin-top:14px;display:flex;align-items:center;gap:6px'>{SVG['clipboard_check']} Protocolo de verificación para la Coordinadora</b>", unsafe_allow_html=True)
-            for act in actions:
-                st.checkbox(act, value=False, key=f"chk_{hash(act)}")
-
-        # 5. Razonamiento
-        reason = result.get("razonamiento", "")
-        if reason:
-            with st.expander("Fundamentación y razonamiento normativo"):
-                st.markdown(f'<div class="reason-box">{reason}</div>', unsafe_allow_html=True)
 
     # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
     with col_norm:

@@ -675,6 +675,17 @@ else:
         st.markdown("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px'><b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante (Post-validación)</b></div>", unsafe_allow_html=True)
 
         draft = result.get("borrador_alumno", "")
+        # Salvaguarda final: si contiene JSON crudo, extraer solo el mensaje humano
+        if isinstance(draft, str) and (draft.strip().startswith("{") or '"dictamen_coordinacion"' in draft):
+            import re as _re_ui
+            m_inner = _re_ui.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', draft, _re_ui.DOTALL)
+            if not m_inner:
+                m_inner = _re_ui.search(r'(Estimad[oa][\s\S]*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$|\Z)', draft)
+            if m_inner:
+                draft = m_inner.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+            else:
+                draft = result.get("dictamen_coordinacion", {}).get("resumen_ejecutivo", "") or result.get("razonamiento", "")
+
         st.markdown(f'<div class="draft-box">{draft}</div>', unsafe_allow_html=True)
 
         # Botones de Copia Rápidos

@@ -321,13 +321,21 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         # 5. Intento 3: Extracción regex de campos clave conservando tildes y caracteres UTF-8
         if not parsed:
             parsed = {}
-            m_draft = _re.search(r'"borrador_alumno"\s*:\s*"((?:\\.|[^"\\])*)"', candidate, _re.DOTALL)
+
+            # Extracción robusta de borrador_alumno (tolera comillas internas sin escapar de MiMo)
+            m_draft = _re.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', candidate, _re.DOTALL)
+            if not m_draft:
+                m_draft = _re.search(r'"borrador_alumno"\s*:\s*"((?:\\.|[^"\\])*)"', candidate, _re.DOTALL)
+
             if m_draft:
                 parsed["borrador_alumno"] = _clean_str(m_draft.group(1))
             else:
-                clean_raw = _re.sub(r'^```(?:json)?\s*', '', text)
-                clean_raw = _re.sub(r'\s*```$', '', clean_raw).strip()
-                parsed["borrador_alumno"] = clean_raw
+                # Buscar si hay un cuerpo de mensaje institucional que comience con Estimado
+                m_est = _re.search(r'(Estimad[oa][\s\S]*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$|\Z)', candidate)
+                if m_est:
+                    parsed["borrador_alumno"] = _clean_str(m_est.group(1))
+                else:
+                    parsed["borrador_alumno"] = ""
 
             m_appr = _re.search(r'"requiere_aprobacion"\s*:\s*"((?:\\.|[^"\\])*)"', candidate)
             parsed["requiere_aprobacion"] = _clean_str(m_appr.group(1)) if m_appr else "La coordinadora puede resolver directamente"
@@ -385,14 +393,33 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             ]
         parsed["acciones_coordinadora"] = clean_acc
 
-        # 8. Limpieza del borrador del alumno (Eliminar corchetes [1], [2] y encabezados robóticos)
-        if "borrador_alumno" in parsed and parsed["borrador_alumno"]:
-            d_text = parsed["borrador_alumno"]
+        # 8. Limpieza del borrador del alumno (Eliminar corchetes [1], [2], encabezados robóticos y JSON crudo)
+        d_text = parsed.get("borrador_alumno", "")
+        if isinstance(d_text, str):
+            # Si por algún motivo contiene JSON crudo (empieza con { o contiene "dictamen_coordinacion")
+            if d_text.strip().startswith("{") or '"dictamen_coordinacion"' in d_text:
+                m_inner = _re.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', d_text, _re.DOTALL)
+                if m_inner:
+                    d_text = _clean_str(m_inner.group(1))
+                else:
+                    m_est = _re.search(r'(Estimad[oa][\s\S]*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$|\Z)', d_text)
+                    if m_est:
+                        d_text = _clean_str(m_est.group(1))
+                    else:
+                        d_text = ""
+
+            # Si sigue vacío o no se encontró mensaje, generar un borrador institucional limpio a partir del dictamen
+            if not d_text.strip():
+                res_ej = parsed.get("dictamen_coordinacion", {}).get("resumen_ejecutivo", "") or parsed.get("razonamiento", "")
+                d_text = f"Estimado(a) estudiante,\n\nCon relación a su consulta sobre la aplicación de la normativa académica institucional, le informamos lo siguiente:\n\n{res_ej}\n\nQuedamos a su disposición para cualquier orientación adicional en su trámite.\n\nAtentamente,\nCoordinación Académica - Universidad ESAN"
+
             # Quitar corchetes numéricos tipo [1], [2], [1][2]
             d_text = _re.sub(r'\s*\[\d+\](?:\s*\[\d+\])*', '', d_text)
             # Quitar encabezados robóticos de plantilla como "1. Diagnóstico de su consulta", "2. Fundamentación"
             d_text = _re.sub(r'(?m)^\s*(?:\d+\.|\b\d+\.\d+\b)\s*(?:Diagnóstico|Fundamentación|Consecuencias|Procedimiento|Documentación|Requisitos)[^\n]*\n+', '', d_text)
             parsed["borrador_alumno"] = d_text.strip()
+        else:
+            parsed["borrador_alumno"] = ""
 
         # 9. Normalizar y deduplicar citas_normativas
         raw_citas = parsed.get("citas_normativas", [])

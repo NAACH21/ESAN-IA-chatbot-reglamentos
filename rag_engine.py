@@ -80,6 +80,13 @@ REGLAS ABSOLUTAS:
 
 4. DIVERSIDAD DE CITAS:
    En 'citas_normativas', cada cita debe referir a un artículo o regla distinta. No repitas la misma cita 4 veces con fragmentos de la misma frase.
+
+5. CONTEXTUALIZACION POR TIPO DE PROGRAMA:
+   Cuando se indique el tipo de programa del participante (PEE, PADE, PAE, Diploma, CIE, Maestria, Doctorado):
+   - Menciona explicitamente el programa en el dictamen ejecutivo y en el borrador para el alumno.
+   - Aplica unicamente los reglamentos correspondientes a ese tipo de programa; NO cruces normas de Maestria con Educacion Ejecutiva ni viceversa.
+   - En el borrador para el alumno, menciona el programa en el saludo o primer parrafo (ej: 'Como participante del programa PEE...').
+   - En 'acciones_coordinadora', incluye verificaciones especificas del programa indicado.
 """
 
 
@@ -197,6 +204,7 @@ class RAGEngine:
         model_label: str = "GPT-4o-mini  (Rápido · ~$0.0005/consulta)",
         chat_history: List[Dict[str, str]] = None,
         top_k: int = 6,
+        programa: str = "",
     ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Devuelve (parsed_dict, sources).
@@ -222,10 +230,14 @@ class RAGEngine:
             )
         context_str = "\n---\n".join(context_parts)
 
+        programa_ctx = (f"\nPROGRAMA DEL PARTICIPANTE: {programa}\n"
+                       f"Adapta el dictamen y el borrador al contexto especifico del programa '{programa}'.\n"
+                       "Aplica solo los reglamentos correspondientes a este tipo de programa.") if programa else ""
+
         user_content = f"""FRAGMENTOS NORMATIVOS VERIFICADOS:
 {context_str}
 
-CONSULTA DE LA COORDINADORA:
+CONSULTA DE LA COORDINADORA:{programa_ctx}
 Mensaje del alumno: {query}
 {f'Contexto adicional: {context_extra}' if context_extra else ''}
 

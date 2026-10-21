@@ -386,6 +386,7 @@ for key, default in [
     ("last_result", None),
     ("last_sources", []),
     ("quick_q", None),
+    ("programa_sel", None),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -620,7 +621,16 @@ else:
 
     # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
     with col_resp:
-        st.markdown(f'<div class="esan-card-title">{SVG["scale"]} Dictamen Técnico y Validación para Coordinación</div>', unsafe_allow_html=True)
+        _prog_sel = st.session_state.get('programa_sel', '')
+        _prog_badge = (
+            f'<span style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;'
+            f'border-radius:6px;padding:2px 10px;font-size:0.75rem;font-weight:700;margin-left:8px"'
+            f'>{_prog_sel}</span>'
+        ) if _prog_sel else ''
+        st.markdown(
+            f'<div class="esan-card-title">{SVG["scale"]} Dictamen Técnico y Validación para Coordinación{_prog_badge}</div>',
+            unsafe_allow_html=True
+        )
 
         # 1. DICTAMEN EJECUTIVO Y PROCEDENCIA (RESPUESTA PRINCIPAL PARA LA COORDINADORA)
         dictamen = result.get("dictamen_coordinacion", {})
@@ -762,6 +772,33 @@ with st.container():
     </div>
     """, unsafe_allow_html=True)
 
+    # ── SELECTOR DE PROGRAMA (OBLIGATORIO) ────────────────────────────────
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+        f'{SVG["grad_cap"]} Tipo de programa del participante '
+        '<span style="color:#D31418;font-weight:900">*</span>'
+        '<span style="font-weight:400;color:#64748B;font-size:0.75rem;margin-left:4px">(obligatorio)</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    programa_options = ["PEE", "PADE", "PAE", "Diploma", "CIE", "Maestr\u00eda", "Doctorado"]
+    st.radio(
+        "Programa",
+        options=programa_options,
+        index=None,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="programa_sel",
+    )
+    if not st.session_state.get("programa_sel"):
+        st.markdown(
+            '<div style="color:#D31418;font-size:0.78rem;margin-bottom:6px;display:flex;align-items:center;gap:4px">'
+            f'{SVG["alert"]} Debe seleccionar el tipo de programa antes de emitir el dictamen.'
+            '</div>',
+            unsafe_allow_html=True
+        )
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
     default_prompt = st.session_state.quick_q or ""
     c_input, c_btn = st.columns([5.5, 1.5], gap="small")
 
@@ -777,7 +814,7 @@ with st.container():
 
     with c_btn:
         st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
-        can_run = bool(api_key and student_msg.strip())
+        can_run = bool(api_key and student_msg.strip() and st.session_state.get("programa_sel"))
         run_query = st.button("Emitir Dictamen →", use_container_width=True, type="primary", disabled=not can_run)
         if st.session_state.history:
             st.caption(f"Historial: {len(st.session_state.history)} consultas")
@@ -805,6 +842,7 @@ if run_query and api_key and student_msg.strip():
                 context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
                 model_label=model_label,
                 chat_history=st.session_state.history,
+                programa=st.session_state.get("programa_sel", ""),
             )
             st.session_state.last_result = result_data
             st.session_state.last_sources = sources_data

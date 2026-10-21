@@ -387,6 +387,8 @@ for key, default in [
     ("last_sources", []),
     ("quick_q", None),
     ("programa_sel", None),
+    ("query_input", ""),
+    ("processing", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -517,6 +519,19 @@ with st.sidebar:
         st.rerun()
 
 # ── TOP NAVBAR INSTITUCIONAL REIMAGINADO (SIN FORMATO IA DE JUGUETE) ─────────
+# Ancla invisible para scroll-to-top via JS
+st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
+
+# Auto-scroll al top cuando hay resultado nuevo
+if st.session_state.get("scroll_to_top"):
+    st.markdown(
+        '''<script>
+        window.parent.document.querySelector("section.main").scrollTo({top: 0, behavior: "smooth"});
+        </script>''',
+        unsafe_allow_html=True
+    )
+    st.session_state.scroll_to_top = False
+
 logo_html = f'<img src="data:image/svg+xml;base64,{ESAN_LOGO_B64}" alt="Universidad ESAN" class="esan-nav-logo" />' if ESAN_LOGO_B64 else '<div style="font-weight:900;color:#D31418;font-size:1.15rem">ESAN</div>'
 
 st.markdown(f"""
@@ -799,54 +814,85 @@ with st.container():
         )
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    default_prompt = st.session_state.quick_q or ""
-    c_input, c_btn = st.columns([5.5, 1.5], gap="small")
+    # Precarga desde quick_q si aplica
+    if st.session_state.quick_q:
+        st.session_state.query_input = st.session_state.quick_q
+        st.session_state.quick_q = None
 
-    with c_input:
-        student_msg = st.text_area(
-            "Consulta del estudiante",
-            value=default_prompt,
-            height=85,
-            placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
-            label_visibility="collapsed",
-            max_chars=4000,
-        )
+    student_msg = st.text_area(
+        "Consulta del estudiante",
+        value=st.session_state.query_input,
+        height=90,
+        placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
+        label_visibility="collapsed",
+        max_chars=4000,
+        key="student_msg_area",
+    )
 
-    with c_btn:
-        st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
-        can_run = bool(api_key and student_msg.strip() and st.session_state.get("programa_sel"))
-        run_query = st.button("Emitir Dictamen →", use_container_width=True, type="primary", disabled=not can_run)
-        if st.session_state.history:
-            st.caption(f"Historial: {len(st.session_state.history)} consultas")
-
-    with st.expander("Parámetros opcionales del caso (programa, ciclo, antecedentes del alumno)"):
+    with st.expander("Parámetros opcionales del caso (ciclo, antecedentes del alumno)"):
         extra_ctx = st.text_input(
             "Contexto extra",
-            placeholder="Ej: Programa DPA, ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
+            placeholder="Ej: ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
             label_visibility="collapsed"
         )
 
-    if st.session_state.quick_q:
-        st.session_state.quick_q = None
+    can_run = bool(api_key and student_msg.strip() and st.session_state.get("programa_sel"))
+
+    # Botón principal — ancho completo, muy prominente
+    col_run, col_hist = st.columns([3, 1])
+    with col_run:
+        run_query = st.button(
+            "▶  Consultar reglamentos y emitir dictamen",
+            use_container_width=True,
+            type="primary",
+            disabled=not can_run,
+            help="Seleccione el tipo de programa y escriba la consulta para activar." if not can_run else "Haga clic para generar el dictamen normativo.",
+        )
+    with col_hist:
+        if st.session_state.history:
+            st.markdown(
+                f'<div style="font-size:0.75rem;color:#64748B;text-align:center;padding-top:10px">'
+                f'{len(st.session_state.history)} consulta(s) previas</div>',
+                unsafe_allow_html=True
+            )
 
 # ── PROCESAMIENTO DE CONSULTA ─────────────────────────────────────────────────
 if run_query and api_key and student_msg.strip():
-    with st.spinner("Buscando artículos en reglamentos y redactando dictamen institucional..."):
-        try:
-            if not is_indexed and api_key:
-                build_vector_store(api_key=api_key)
-                rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
+    # Banner de carga visible y prominente
+    loading_slot = st.empty()
+    loading_slot.markdown(
+        '<div style="background:#1E293B;color:#F8FAFC;border-radius:10px;'
+        'padding:18px 20px;margin:12px 0;display:flex;align-items:center;gap:14px">'
+        '<div style="width:22px;height:22px;border:3px solid #D31418;'
+        'border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div>'
+        '<div>'
+        '<div style="font-weight:700;font-size:0.95rem">Analizando reglamentos y redactando dictamen...</div>'
+        '<div style="font-size:0.78rem;color:#94A3B8;margin-top:2px">Esto puede tardar unos segundos según el modelo seleccionado.</div>'
+        '</div></div>'
+        '<style>@keyframes spin{to{transform:rotate(360deg)}}</style>',
+        unsafe_allow_html=True
+    )
+    try:
+        if not is_indexed and api_key:
+            build_vector_store(api_key=api_key)
+            rag = RAGEngine(api_key=api_key, openrouter_key=or_key)
 
-            result_data, sources_data = rag.answer_question(
-                query=student_msg.strip(),
-                context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
-                model_label=model_label,
-                chat_history=st.session_state.history,
-                programa=st.session_state.get("programa_sel", ""),
-            )
-            st.session_state.last_result = result_data
-            st.session_state.last_sources = sources_data
-            st.session_state.history.append(student_msg.strip()[:120])
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al procesar la consulta: {e}")
+        result_data, sources_data = rag.answer_question(
+            query=student_msg.strip(),
+            context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
+            model_label=model_label,
+            chat_history=st.session_state.history,
+            programa=st.session_state.get("programa_sel", ""),
+        )
+        st.session_state.last_result = result_data
+        st.session_state.last_sources = sources_data
+        st.session_state.history.append(student_msg.strip()[:120])
+        # Limpiar input y deseleccionar programa tras responder
+        st.session_state.query_input = ""
+        st.session_state.programa_sel = None
+        st.session_state.scroll_to_top = True
+        loading_slot.empty()
+        st.rerun()
+    except Exception as e:
+        loading_slot.empty()
+        st.error(f"Error al procesar la consulta: {e}")

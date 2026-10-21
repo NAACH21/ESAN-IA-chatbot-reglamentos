@@ -3,6 +3,7 @@ import sys
 import base64
 import importlib
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 try:
@@ -385,10 +386,10 @@ for key, default in [
     ("history", []),
     ("last_result", None),
     ("last_sources", []),
+    ("last_program", None),
     ("quick_q", None),
-    ("programa_sel", None),
-    ("query_input", ""),
-    ("processing", False),
+    ("form_id", 0),
+    ("scroll_to_top", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -516,6 +517,9 @@ with st.sidebar:
         st.session_state.history = []
         st.session_state.last_result = None
         st.session_state.last_sources = []
+        st.session_state.last_program = None
+        st.session_state.quick_q = None
+        st.session_state.form_id += 1
         st.rerun()
 
 # ── TOP NAVBAR INSTITUCIONAL REIMAGINADO (SIN FORMATO IA DE JUGUETE) ─────────
@@ -524,11 +528,24 @@ st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
 
 # Auto-scroll al top cuando hay resultado nuevo
 if st.session_state.get("scroll_to_top"):
-    st.markdown(
-        '''<script>
-        window.parent.document.querySelector("section.main").scrollTo({top: 0, behavior: "smooth"});
-        </script>''',
-        unsafe_allow_html=True
+    components.html(
+        """
+        <script>
+        setTimeout(function() {
+            try {
+                const parentDoc = window.parent.document;
+                const main = parentDoc.querySelector("section.main") || parentDoc.querySelector(".main") || parentDoc.documentElement;
+                if (main) {
+                    main.scrollTo({top: 0, behavior: "smooth"});
+                }
+            } catch (e) {
+                window.parent.scrollTo(0, 0);
+            }
+        }, 150);
+        </script>
+        """,
+        height=0,
+        width=0,
     )
     st.session_state.scroll_to_top = False
 
@@ -585,6 +602,7 @@ if result is None:
         """, unsafe_allow_html=True)
         if st.button("Consultar plazos y trámite de reconsideración →", key="q_recons", use_container_width=True):
             st.session_state.quick_q = "¿Cuándo puedo pedir reconsideración de nota y ante qué autoridad corresponde presentarla?"
+            st.session_state.form_id += 1
             st.rerun()
 
         st.markdown(f"""
@@ -599,6 +617,7 @@ if result is None:
         """, unsafe_allow_html=True)
         if st.button("Consultar directiva sobre uso de IA →", key="q_ia", use_container_width=True):
             st.session_state.quick_q = "¿Cuáles son los lineamientos sobre el uso de Inteligencia Artificial para docentes y alumnos en ESAN?"
+            st.session_state.form_id += 1
             st.rerun()
 
     with c_c2:
@@ -614,6 +633,7 @@ if result is None:
         """, unsafe_allow_html=True)
         if st.button("Consultar requisitos de bachillerato →", key="q_bach", use_container_width=True):
             st.session_state.quick_q = "¿Cuáles son los requisitos y créditos necesarios para obtener el Grado de Bachiller?"
+            st.session_state.form_id += 1
             st.rerun()
 
         st.markdown(f"""
@@ -628,6 +648,7 @@ if result is None:
         """, unsafe_allow_html=True)
         if st.button("Consultar política de devoluciones y retiros →", key="q_ret", use_container_width=True):
             st.session_state.quick_q = "¿Cuál es el procedimiento formal y plazos para solicitar devolución de dinero o retiro de programa?"
+            st.session_state.form_id += 1
             st.rerun()
 
 else:
@@ -636,7 +657,7 @@ else:
 
     # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
     with col_resp:
-        _prog_sel = st.session_state.get('programa_sel', '')
+        _prog_sel = st.session_state.get('last_program', '') or st.session_state.get('programa_sel', '')
         _prog_badge = (
             f'<span style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;'
             f'border-radius:6px;padding:2px 10px;font-size:0.75rem;font-weight:700;margin-left:8px"'
@@ -787,6 +808,8 @@ with st.container():
     </div>
     """, unsafe_allow_html=True)
 
+    current_form_id = st.session_state.form_id
+
     # ── SELECTOR DE PROGRAMA (OBLIGATORIO) ────────────────────────────────
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
@@ -796,16 +819,17 @@ with st.container():
         '</div>',
         unsafe_allow_html=True
     )
-    programa_options = ["PEE", "PADE", "PAE", "Diploma", "CIE", "Maestr\u00eda", "Doctorado"]
-    st.radio(
+    programa_options = ["PEE", "PADE", "PAE", "Diploma", "CIE", "Maestría", "Doctorado"]
+    programa_sel = st.radio(
         "Programa",
         options=programa_options,
         index=None,
         horizontal=True,
         label_visibility="collapsed",
-        key="programa_sel",
+        key=f"prog_choice_{current_form_id}",
     )
-    if not st.session_state.get("programa_sel"):
+
+    if not programa_sel:
         st.markdown(
             '<div style="color:#D31418;font-size:0.78rem;margin-bottom:6px;display:flex;align-items:center;gap:4px">'
             f'{SVG["alert"]} Debe seleccionar el tipo de programa antes de emitir el dictamen.'
@@ -814,39 +838,41 @@ with st.container():
         )
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-    # Precarga desde quick_q si aplica
-    if st.session_state.quick_q:
-        st.session_state.query_input = st.session_state.quick_q
-        st.session_state.quick_q = None
-
+    default_prompt = st.session_state.quick_q or ""
     student_msg = st.text_area(
         "Consulta del estudiante",
-        value=st.session_state.query_input,
+        value=default_prompt,
         height=90,
         placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
         label_visibility="collapsed",
         max_chars=4000,
-        key="student_msg_area",
+        key=f"query_text_{current_form_id}",
     )
+
+    # Si se cargo desde quick_q, limpiar para que no persista en futuros reruns
+    if st.session_state.quick_q:
+        st.session_state.quick_q = None
 
     with st.expander("Parámetros opcionales del caso (ciclo, antecedentes del alumno)"):
         extra_ctx = st.text_input(
             "Contexto extra",
             placeholder="Ej: ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=f"extra_ctx_{current_form_id}",
         )
 
-    can_run = bool(api_key and student_msg.strip() and st.session_state.get("programa_sel"))
+    can_run = bool(api_key and student_msg.strip() and programa_sel)
 
-    # Botón principal — ancho completo, muy prominente
+    # Botón principal prominente con feedback visual
     col_run, col_hist = st.columns([3, 1])
     with col_run:
+        button_help = "Haga clic para consultar la base reglamentaria y generar el dictamen." if can_run else "Seleccione el tipo de programa y escriba la consulta para activar este botón."
         run_query = st.button(
             "▶  Consultar reglamentos y emitir dictamen",
             use_container_width=True,
             type="primary",
             disabled=not can_run,
-            help="Seleccione el tipo de programa y escriba la consulta para activar." if not can_run else "Haga clic para generar el dictamen normativo.",
+            help=button_help,
         )
     with col_hist:
         if st.session_state.history:
@@ -858,18 +884,23 @@ with st.container():
 
 # ── PROCESAMIENTO DE CONSULTA ─────────────────────────────────────────────────
 if run_query and api_key and student_msg.strip():
-    # Banner de carga visible y prominente
+    # Banner de carga visual y prominente
     loading_slot = st.empty()
     loading_slot.markdown(
-        '<div style="background:#1E293B;color:#F8FAFC;border-radius:10px;'
-        'padding:18px 20px;margin:12px 0;display:flex;align-items:center;gap:14px">'
-        '<div style="width:22px;height:22px;border:3px solid #D31418;'
-        'border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div>'
-        '<div>'
-        '<div style="font-weight:700;font-size:0.95rem">Analizando reglamentos y redactando dictamen...</div>'
-        '<div style="font-size:0.78rem;color:#94A3B8;margin-top:2px">Esto puede tardar unos segundos según el modelo seleccionado.</div>'
-        '</div></div>'
-        '<style>@keyframes spin{to{transform:rotate(360deg)}}</style>',
+        f"""
+        <div style="background:#0F172A;border:1px solid #1E293B;color:#F8FAFC;border-radius:10px;padding:18px 22px;margin:14px 0;display:flex;align-items:center;gap:16px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
+          <div style="width:26px;height:26px;border:3px solid #D31418;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0"></div>
+          <div>
+            <div style="font-weight:700;font-size:0.95rem;color:#FFFFFF;display:flex;align-items:center;gap:8px">
+              Procesando dictamen normativo para: <span style="background:#D31418;color:#FFFFFF;padding:1px 8px;border-radius:4px;font-size:0.8rem">{programa_sel}</span>
+            </div>
+            <div style="font-size:0.78rem;color:#94A3B8;margin-top:3px">
+              Buscando artículos en reglamentos vigentes, evaluando procedencia y generando propuesta de correo...
+            </div>
+          </div>
+        </div>
+        <style>@keyframes spin {{ to {{ transform: rotate(360deg); }} }}</style>
+        """,
         unsafe_allow_html=True
     )
     try:
@@ -882,14 +913,15 @@ if run_query and api_key and student_msg.strip():
             context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
             model_label=model_label,
             chat_history=st.session_state.history,
-            programa=st.session_state.get("programa_sel", ""),
+            programa=programa_sel or "",
         )
         st.session_state.last_result = result_data
         st.session_state.last_sources = sources_data
+        st.session_state.last_program = programa_sel
         st.session_state.history.append(student_msg.strip()[:120])
-        # Limpiar input y deseleccionar programa tras responder
-        st.session_state.query_input = ""
-        st.session_state.programa_sel = None
+
+        # Avanzar form_id: limpia automáticamente el textarea y deselecciona el programa sin tocar keys bloqueadas
+        st.session_state.form_id += 1
         st.session_state.scroll_to_top = True
         loading_slot.empty()
         st.rerun()

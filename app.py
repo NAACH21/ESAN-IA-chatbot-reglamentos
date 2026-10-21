@@ -387,6 +387,8 @@ for key, default in [
     ("last_result", None),
     ("last_sources", []),
     ("last_program", None),
+    ("last_query", None),
+    ("last_extra_ctx", None),
     ("quick_q", None),
     ("form_id", 0),
     ("scroll_to_top", False),
@@ -518,6 +520,8 @@ with st.sidebar:
         st.session_state.last_result = None
         st.session_state.last_sources = []
         st.session_state.last_program = None
+        st.session_state.last_query = None
+        st.session_state.last_extra_ctx = None
         st.session_state.quick_q = None
         st.session_state.form_id += 1
         st.rerun()
@@ -652,6 +656,40 @@ if result is None:
             st.rerun()
 
 else:
+    # ── PANEL DE CONSULTA EVALUADA (CONSULTA DEL ESTUDIANTE + PROGRAMA) ────────
+    last_q = st.session_state.get("last_query", "")
+    last_prog = st.session_state.get("last_program", "")
+    last_extra = st.session_state.get("last_extra_ctx", "")
+
+    if last_q:
+        badge_prog_html = (
+            f'<span style="background:#FEF2F2;border:1.5px solid #FECACA;color:#991B1B;'
+            f'padding:3px 12px;border-radius:6px;font-size:0.8rem;font-weight:800;letter-spacing:0.03em;'
+            f'display:inline-flex;align-items:center;gap:6px">'
+            f'{SVG["grad_cap"]} Programa: {last_prog}</span>'
+        ) if last_prog else ''
+
+        extra_html = (
+            f'<div style="font-size:0.8rem;color:#475569;margin-top:8px;padding-top:8px;'
+            f'border-top:1px dashed #CBD5E1;display:flex;align-items:center;gap:6px">'
+            f'<span style="font-weight:700;color:#0F172A">Contexto del caso ingresado:</span> {last_extra}</div>'
+        ) if last_extra else ''
+
+        st.markdown(f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #D31418;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+            <div style="font-size:0.75rem;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:6px">
+              {SVG["search"]} Consulta del Estudiante Evaluada
+            </div>
+            {badge_prog_html}
+          </div>
+          <div style="font-size:0.95rem;color:#0F172A;font-weight:600;line-height:1.45">
+            "{last_q}"
+          </div>
+          {extra_html}
+        </div>
+        """, unsafe_allow_html=True)
+
     # ── VISTA DE RESULTADOS (2 COLUMNAS: RESPUESTA + RESPALDO NORMATIVO) ───────
     col_resp, col_norm = st.columns([1.35, 1.15], gap="large")
 
@@ -774,8 +812,23 @@ else:
             pagina = c.get("pagina", "")
             extracto = c.get("extracto", "")
 
-            doc_drive_url = get_file_drive_url(doc_name, pagina)
-            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
+            # Si el modelo modificó o parafraseó el nombre, recuperar el archivo real indexado en ChromaDB
+            fallback_source = ""
+            fallback_page = ""
+            if isinstance(num, int) and 1 <= num <= len(sources):
+                fallback_source = sources[num - 1].get("source", "")
+                fallback_page = str(sources[num - 1].get("page", ""))
+
+            doc_drive_url = get_file_drive_url(
+                filename=doc_name,
+                page=pagina,
+                fallback_filename=fallback_source,
+                fallback_page=fallback_page,
+            )
+
+            # Página efectiva para el badge visual
+            eff_page = pagina or fallback_page
+            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {eff_page}</span>' if eff_page else ""
 
             st.markdown(f"""
             <div class="cite-card">
@@ -918,6 +971,8 @@ if run_query and api_key and student_msg.strip():
         st.session_state.last_result = result_data
         st.session_state.last_sources = sources_data
         st.session_state.last_program = programa_sel
+        st.session_state.last_query = student_msg.strip()
+        st.session_state.last_extra_ctx = extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else ""
         st.session_state.history.append(student_msg.strip()[:120])
 
         # Avanzar form_id: limpia automáticamente el textarea y deselecciona el programa sin tocar keys bloqueadas

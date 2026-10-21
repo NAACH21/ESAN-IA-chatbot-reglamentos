@@ -53,31 +53,112 @@ def load_drive_id_map() -> Dict[str, str]:
             return {}
     return {}
 
-def get_file_drive_url(filename: str, page: Any = None) -> str:
+import unicodedata
+
+_STEMS_MAP = {
+    "reglamento": "reglam", "reglamentos": "reglam", "reglam": "reglam",
+    "general": "gral", "gral": "gral",
+    "diploma": "diplom", "diplomas": "diplom", "diplomado": "diplom", "diplomados": "diplom", "diplom": "diplom",
+    "certificado": "certif", "certificados": "certif", "certif": "certif",
+    "maestria": "maestria", "maestrias": "maestria",
+    "doctorado": "doctoral", "doctorados": "doctoral", "doctorales": "doctoral", "doctoral": "doctoral",
+    "educacion": "educacion", "ejecutiva": "ejecutiva", "ejecutivo": "ejecutiva",
+    "postgrado": "posgrado", "posgrado": "posgrado",
+    "examen": "examen", "examenes": "examen", "extemporaneo": "extemporaneo",
+    "moodle": "moodle", "zoom": "zoom", "plataforma": "plataforma",
+    "lineamiento": "lineamiento", "lineamientos": "lineamiento",
+}
+
+def _strip_accents(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
+
+def _tokenize_name(text: str):
+    text = _strip_accents(text.lower())
+    text = re.sub(r"\.(pdf|docx|xlsx)$", "", text)
+    words = re.findall(r"[a-z0-9]+", text)
+    tokens = set()
+    for w in words:
+        s = _STEMS_MAP.get(w, w)
+        if len(s) >= 3:
+            tokens.add(s)
+    return tokens
+
+def _find_drive_id(name_query: str, id_map: dict) -> str:
+    if not name_query or not name_query.strip():
+        return ""
+    clean = os.path.basename(name_query).strip().lower()
+    clean_noacc = _strip_accents(clean)
+
+    # 1. Búsqueda exacta
+    for k, fid in id_map.items():
+        if _strip_accents(os.path.basename(k).strip().lower()) == clean_noacc:
+            return fid
+
+    # 2. Subcadena directa
+    for k, fid in id_map.items():
+        base = _strip_accents(os.path.basename(k).strip().lower())
+        if clean_noacc in base or base in clean_noacc:
+            return fid
+
+    # 3. Búsqueda difusa por solapamiento de tokens / raíces
+    q_tokens = _tokenize_name(clean)
+    if not q_tokens:
+        return ""
+    best_match = None
+    best_score = 0.0
+    for k, fid in id_map.items():
+        k_tokens = _tokenize_name(k)
+        if not k_tokens:
+            continue
+        overlap = len(q_tokens.intersection(k_tokens))
+        score = overlap / (len(q_tokens) + 0.2 * len(k_tokens))
+        if score > best_score:
+            best_score = score
+            best_match = (fid, k, score)
+
+    if best_match and best_match[2] >= 0.25:
+        return best_match[0]
+    return ""
+
+def get_file_drive_url(filename: str, page: Any = None, fallback_filename: str = "", fallback_page: Any = None) -> str:
     """
-    Retorna el enlace directo al archivo específico en Google Drive.
-    Si se especifica la página, agrega el parámetro para abrir directamente en esa página.
-    Si no se encuentra el ID, retorna el enlace a la carpeta principal de Drive.
+    Retorna el enlace directo al archivo específico en Google Drive (https://drive.google.com/file/d/{id}/view#page={p}).
+    Soporta coincidencia exacta, subcadena, tokens aproximados y fallback a la fuente real de ChromaDB.
+    Si no se encuentra coincidencia, retorna DEFAULT_DRIVE_FOLDER.
     """
     id_map = load_drive_id_map()
-    clean_name = os.path.basename(filename).strip().lower()
+    file_id = ""
 
-    file_id = None
-    for name, fid in id_map.items():
-        base = os.path.basename(name).strip().lower()
-        if base == clean_name:
-            file_id = fid
-            break
-        if clean_name in base or base in clean_name:
-            file_id = fid
-            break
+    # 1. Intentar con el nombre de la cita si es exacto o subcadena
+    if filename:
+        clean_noacc = _strip_accents(os.path.basename(filename).strip().lower())
+        for k, fid in id_map.items():
+            base = _strip_accents(os.path.basename(k).strip().lower())
+            if base == clean_noacc or clean_noacc in base or base in clean_noacc:
+                file_id = fid
+                break
+
+    # 2. Si no coincide y tenemos el nombre de archivo real de ChromaDB, buscarlo prioritariamente
+    if not file_id and fallback_filename:
+        file_id = _find_drive_id(fallback_filename, id_map)
+
+    # 3. Si aún no, buscar difusamente sobre el nombre indicado por la cita
+    if not file_id and filename:
+        file_id = _find_drive_id(filename, id_map)
+
+    # 4. Si aún no, buscar difusamente sobre fallback
+    if not file_id and fallback_filename:
+        file_id = _find_drive_id(fallback_filename, id_map)
+
+    used_page = page if (page and str(page).strip() not in ("", "None", "0")) else fallback_page
 
     if file_id:
         url = f"https://drive.google.com/file/d/{file_id}/view"
-        if page:
+        if used_page:
             try:
-                p_int = int(str(page).strip().split()[0])
-                url += f"#page={p_int}"
+                p_digits = re.findall(r"\d+", str(used_page))
+                if p_digits:
+                    url += f"#page={int(p_digits[0])}"
             except Exception:
                 pass
         return url

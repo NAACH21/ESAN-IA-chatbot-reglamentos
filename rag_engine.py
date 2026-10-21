@@ -55,7 +55,7 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves:
   "citas_normativas": [
     {
       "numero": 1,
-      "documento": "nombre exacto del archivo PDF o documento",
+      "documento": "nombre exacto del archivo con su extensión tal como figura en los fragmentos (ej: 'CU198_Reglam_Gral_Program_Educacion-Ejecutiva.pdf'). NUNCA inventes ni resumas nombres de archivo.",
       "seccion": "Artículo, Capítulo o Directiva identificada",
       "pagina": "número de página o sección",
       "extracto": "frase textual literal del documento que fundamenta la decisión (máx. 200 caracteres)"
@@ -78,8 +78,9 @@ REGLAS ABSOLUTAS:
    - NO incluyas corchetes numéricos como [1] o [2] en el borrador para el alumno (las citas técnicas van en 'citas_normativas' para la coordinadora).
    - NO uses numeraciones rígidas de plantilla como '1. Diagnóstico', '2. Fundamentación normativa', '2.1', 'Paso 1, Paso 2'. Redáctalo con fluidez profesional.
 
-4. DIVERSIDAD DE CITAS:
-   En 'citas_normativas', cada cita debe referir a un artículo o regla distinta. No repitas la misma cita 4 veces con fragmentos de la misma frase.
+4. DIVERSIDAD Y EXACTITUD DE CITAS:
+   - En 'citas_normativas', el campo 'documento' DEBE SER EL NOMBRE REAL DEL ARCHIVO con su extensión (ej: 'CU198_Reglam_Gral_Program_Educacion-Ejecutiva.pdf', 'Tarifario-POSGRADO-Junio-2026.pdf') tal como figura textualmente en el encabezado [FRAGMENTO #X | ...]. QUEDA PROHIBIDO inventar o parafrasear títulos genéricos.
+   - Cada cita debe referir a un artículo o regla distinta. No repitas la misma cita 4 veces con fragmentos de la misma frase.
 
 5. CONTEXTUALIZACION POR TIPO DE PROGRAMA:
    Cuando se indique el tipo de programa del participante (PEE, PADE, PAE, Diploma, CIE, Maestria, Doctorado):

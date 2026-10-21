@@ -16,6 +16,8 @@ import ingest as _ingest_mod
 importlib.reload(_ingest_mod)
 import rag_engine as _rag_mod
 importlib.reload(_rag_mod)
+import drive_sync as _drive_mod
+importlib.reload(_drive_mod)
 
 from ingest import (
     build_vector_store,

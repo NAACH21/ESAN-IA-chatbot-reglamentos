@@ -297,11 +297,16 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
 
         raw = ""
         try:
+            max_output_tokens = (
+                6000 if model_cfg["provider"] == "openrouter"
+                else 2500
+            )
+
             kwargs = dict(
                 model=model_cfg["model_id"],
                 messages=messages,
                 temperature=0.15,
-                max_tokens=2000,
+                max_tokens=max_output_tokens,
                 response_format={"type": "json_object"},
             )
             try:
@@ -312,6 +317,45 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 response = client.chat.completions.create(**kwargs)
 
             raw = response.choices[0].message.content.strip()
+            if response.choices[0].finish_reason == "length":
+                print(
+                    "[RAG] ERROR: el modelo alcanzó el límite "
+                    "de generación antes de completar su respuesta."
+                )
+
+                return {
+                    "dictamen_coordinacion": {
+                        "procedencia": "Error técnico — Respuesta incompleta",
+                        "resumen_ejecutivo": (
+                            "El modelo no completó la generación "
+                            "del dictamen. Esto no demuestra "
+                            "insuficiencia normativa."
+                        )
+                    },
+                    "requiere_aprobacion": "No determinado",
+                    "acciones_coordinadora": [
+                        "Reintentar la consulta tras ajustar "
+                        "el límite de generación."
+                    ],
+                    "razonamiento": (
+                        "La generación fue interrumpida "
+                        "por el límite de tokens."
+                    ),
+                    "borrador_alumno": "",
+                    "citas_normativas": [],
+                    "auditoria_citas": {
+                        "propuestas": 0,
+                        "duplicadas": 0,
+                        "no_verificables": 0,
+                        "aceptadas": 0
+                    },
+                    "validacion_pendiente": True,
+                    "error_tecnico": "generation_length"
+                }, sources
+            print("\n=== ESTADO DE GENERACION ===")
+            print("Modelo:", model_cfg["model_id"])
+            print("Motivo de finalización:", response.choices[0].finish_reason)
+            print("Caracteres recibidos:", len(raw))
         except Exception as api_err:
             return {
                 "requiere_aprobacion": "Error de comunicación con la API",
@@ -345,8 +389,12 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             p = json.loads(candidate, strict=False)
             if isinstance(p, dict):
                 parsed = p
-        except Exception:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"[RAG] JSON inválido: {e.msg} (línea {e.lineno}, columna {e.colno})")
+            if os.getenv("RAG_DEBUG_JSON") == "1":
+                print("Contexto:", repr(candidate[max(0, e.pos - 80):e.pos + 80]))
+        except Exception as e:
+            print(f"[RAG] Error inesperado en JSON: {type(e).__name__}: {e}")
 
         # 4. Intento 2: Limpieza de comas finales (trailing commas)
         if not parsed:
@@ -362,9 +410,36 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             """Decodifica escapes sin alterar caracteres UTF-8 ni tildes."""
             return s.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
 
-        # 5. Intento 3: Extracción regex de campos clave conservando tildes y caracteres UTF-8
+        # 5. Rescate de campos cuando la respuesta completa no es JSON válido.
+        # Se conservan las citas estructuradas: no se aceptan por defecto;
+        # validate_citations comprueba posteriormente su literalidad y origen.
         if not parsed:
-            parsed = {}
+            print("[RAG] Activado parseo alternativo de JSON; caracteres:", len(raw))
+            if os.getenv("RAG_DEBUG_JSON") == "1":
+                print("Inicio:", repr(raw[:250]))
+                print("Final:", repr(raw[-350:]))
+
+            parsed = {"citas_normativas": []}
+            match_citas = _re.search(r'"citas_normativas"\s*:\s*\[', candidate)
+            if match_citas:
+                decoder = json.JSONDecoder(strict=False)
+                pos = match_citas.end()
+                while pos < len(candidate):
+                    while pos < len(candidate) and candidate[pos] in " \t\r\n,":
+                        pos += 1
+                    if pos >= len(candidate) or candidate[pos] == "]":
+                        break
+                    try:
+                        cita, consumed = decoder.raw_decode(candidate[pos:])
+                    except json.JSONDecodeError as e:
+                        print(f"[RAG] Cita no recuperable en posición {pos}: {e.msg}")
+                        break
+                    if (isinstance(cita, dict)
+                            and isinstance(cita.get("fragmento_id"), str)
+                            and isinstance(cita.get("extracto"), str)):
+                        parsed["citas_normativas"].append(cita)
+                    pos += consumed
+            print("[RAG] Citas rescatadas del JSON alternativo:", len(parsed["citas_normativas"]))
 
             # Extracción robusta de borrador_alumno (tolera comillas internas sin escapar de MiMo)
             m_draft = _re.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', candidate, _re.DOTALL)
@@ -465,8 +540,45 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         else:
             parsed["borrador_alumno"] = ""
 
+
+        print("\n=== RESPUESTA INTERPRETADA ===")
+
+        print("Tipo de respuesta:", type(parsed).__name__)
+
+        print(
+            "Campos encontrados:",
+            list(parsed.keys()) if isinstance(parsed, dict) else "No es dict"
+        )
+
+        print(
+            "Citas originales:",
+            repr(parsed.get("citas_normativas", "CAMPO AUSENTE"))
+            if isinstance(parsed, dict)
+            else "JSON no válido"
+        )
+
         # 9. Citas trazables: el servidor verifica extracto y asigna página/documento.
         citas, auditoria = validate_citations(parsed.get("citas_normativas", []), sources)
+
+
+        print("\n=== DIAGNOSTICO DE CITAS ===")
+
+        print("CITAS PROPUESTAS:", len(parsed.get("citas_normativas", [])))
+        if os.getenv("RAG_DEBUG_JSON") == "1":
+            print(json.dumps(parsed.get("citas_normativas", []), ensure_ascii=False, indent=2))
+
+        print("AUDITORIA:")
+        print(json.dumps(
+            auditoria,
+            ensure_ascii=False,
+            indent=2
+        ))
+
+        print("CITAS ACEPTADAS:", len(citas))
+
+
+
+
         parsed["citas_normativas"] = citas
         parsed["auditoria_citas"] = auditoria
         parsed["validacion_pendiente"] = not bool(citas)

@@ -131,3 +131,49 @@ class TestCitasNormativas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVinculacionV3(unittest.TestCase):
+    def test_vincula_y_reutiliza_numero_deduplicado(self):
+        from citation_utils import link_claims_to_citations
+        text = ("La solicitud se presenta ante Coordinación del programa con la documentación correspondiente. "
+                "El plazo de reconsideración de calificaciones es de cinco días calendario desde la notificación.")
+        sources = [source(text, DOC_DIPLOMA, 28)]
+        proposals = [
+            {"fragmento_id": "F1", "extracto": "La solicitud se presenta ante Coordinación del programa con la documentación correspondiente."},
+            {"fragmento_id": "F1", "extracto": "solicitud se presenta ante Coordinación del programa con la documentación correspondiente."},
+            {"fragmento_id": "F1", "extracto": "El plazo de reconsideración de calificaciones es de cinco días calendario desde la notificación."},
+        ]
+        valid, stats = validate_citations(proposals, sources)
+        self.assertEqual(stats["duplicadas"], 1)
+        claims = link_claims_to_citations([
+            {"texto": "Solicitar en Coordinación", "cita_indices": [2]},
+            {"texto": "Plazo", "cita_indices": [3, 1]},
+        ], proposals, valid, sources)
+        self.assertEqual(claims, [
+            {"texto": "Solicitar en Coordinación", "numeros": [1]},
+            {"texto": "Plazo", "numeros": [2, 1]},
+        ])
+
+    def test_no_vincula_cita_invalida_o_inexistente(self):
+        from citation_utils import link_claims_to_citations
+        sources = [source("El plazo es de cinco días calendario desde la comunicación de la nota.")]
+        proposals = [{"fragmento_id": "F1", "extracto": "El plazo es de tres días calendario."}]
+        valid, _ = validate_citations(proposals, sources)
+        self.assertEqual(link_claims_to_citations([
+            {"texto": "Plazo de tres días", "cita_indices": [1, 99]},
+        ], proposals, valid, sources), [])
+
+    def test_dos_reglas_misma_pagina_con_numeros_distintos(self):
+        from citation_utils import link_claims_to_citations
+        sources = [source("La solicitud se presenta ante Coordinación del programa. "
+                          "El plazo es de cinco días calendario desde la notificación.", DOC_DIPLOMA, 28)]
+        proposals = [
+            {"fragmento_id": "F1", "extracto": "La solicitud se presenta ante Coordinación del programa."},
+            {"fragmento_id": "F1", "extracto": "El plazo es de cinco días calendario desde la notificación."},
+        ]
+        valid, _ = validate_citations(proposals, sources)
+        self.assertEqual([r["numeros"] for r in link_claims_to_citations([
+            {"texto": "Canal de solicitud", "cita_indices": [1]},
+            {"texto": "Plazo", "cita_indices": [2]},
+        ], proposals, valid, sources)], [[1], [2]])

@@ -103,6 +103,32 @@ html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+/* V3.2: desplazamiento suave y centrado visual de citas vinculadas. */
+html,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+    scroll-behavior: smooth;
+}
+
+/* La tarjeta se sitúa aproximadamente en el centro del área visible. */
+.cite-card[id^="cita-"] {
+    scroll-margin-top: calc(50vh - 75px);
+}
+
+/* El destino del enlace se ilumina brevemente y vuelve a su estilo normal. */
+@keyframes espan-cita-destacada {
+    0%   { background-color: rgba(250, 204, 21, 0.25); box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4); }
+    65%  { background-color: rgba(250, 204, 21, 0.16); box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2); }
+    100% { background-color: transparent; box-shadow: none; }
+}
+.cite-card[id^="cita-"]:target {
+    animation: espan-cita-destacada 1.6s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+    html, [data-testid="stAppViewContainer"], [data-testid="stMain"] { scroll-behavior: auto; }
+    .cite-card[id^="cita-"]:target { animation: none; outline: 2px solid #D4A017; }
+}
+
 /* Navbar Institucional Superior */
 .esan-navbar {
     display: flex;
@@ -641,6 +667,35 @@ else:
             badge_bg, badge_border, badge_text = "#F0FDF4", "#BBF7D0", "#166534"
             icon_badge = SVG["check"]
 
+        # V3.1: las afirmaciones referenciadas sustituyen al resumen libre
+        # dentro del recuadro. Nunca se duplica el criterio en otro apartado.
+        # Los números proceden exclusivamente de citas ya validadas por Python.
+        claims_linked = result.get("afirmaciones_citadas_validadas", [])
+        citas_aceptadas = result.get("citas_normativas", [])
+        partes_criterio = []
+        if not result.get("validacion_pendiente") and isinstance(claims_linked, list):
+            for claim in claims_linked:
+                if not isinstance(claim, dict):
+                    continue
+                texto = str(claim.get("texto", "")).strip()
+                numeros = []
+                for numero in claim.get("numeros", []):
+                    if isinstance(numero, int) and not isinstance(numero, bool) and 1 <= numero <= len(citas_aceptadas) and numero not in numeros:
+                        numeros.append(numero)
+                if texto and numeros:
+                    refs = " ".join(
+                        f'<a href="#cita-{n}" style="color:#1D4ED8;font-weight:700;text-decoration:none">[{n}]</a>'
+                        for n in numeros
+                    )
+                    partes_criterio.append(f"{escape(texto)} {refs}")
+
+        if partes_criterio:
+            criterio_html = " ".join(partes_criterio)
+        else:
+            # Sin relaciones verificadas, se conserva el resumen sin insertar
+            # referencias arbitrarias. La interfaz conserva su estado de revisión.
+            criterio_html = escape(resumen_ejecutivo)
+
         st.markdown(f"""
         <div style="background:{badge_bg};border:1.5px solid {badge_border};border-radius:8px;padding:12px 16px;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -649,7 +704,7 @@ else:
             </span>
           </div>
           <div style="font-size:0.86rem;color:#1E293B;line-height:1.5;margin-bottom:8px">
-            <b>Criterio resolutivo:</b> {escape(resumen_ejecutivo)}
+            <b>Criterio resolutivo:</b> {criterio_html}
           </div>
           <div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px">
             {SVG['shield_check']} <span><b>Instancia competente:</b> {escape(appr)}</span>
@@ -750,7 +805,7 @@ else:
             badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
 
             st.markdown(f"""
-            <div class="cite-card">
+            <div class="cite-card" id="cita-{num}">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
                 <span class="cite-num">{num}</span>
                 <div style="flex:1">

@@ -29,6 +29,7 @@ from ingest import (
     ARCHIVE_FOLDER,
 )
 from rag_engine import RAGEngine, MODELS, GOOGLE_DRIVE_FOLDER
+from pdf_viewer import locate_local_pdf, render_pdf_page
 from drive_sync import (
     sync_from_drive,
     download_full_folder_gdown,
@@ -38,6 +39,47 @@ from drive_sync import (
 )
 
 load_dotenv()
+
+
+@st.cache_data(show_spinner=False, max_entries=24)
+def _cached_pdf_page(pdf_path: str, pdf_mtime_ns: int, page: int, excerpt: str):
+    # pdf_mtime_ns invalida caché si cambia el archivo.
+    return render_pdf_page(pdf_path, page, excerpt=excerpt)
+
+
+@st.dialog("Página citada del reglamento", width="large")
+def show_pdf_dialog(document_name: str, page_number: int, excerpt: str):
+    """Vista de una única página del PDF; no mantiene widgets de navegación."""
+    local_pdf = locate_local_pdf(document_name)
+    if local_pdf is None:
+        st.warning("No se encontró este documento en DOCS. Utiliza el enlace a Google Drive.")
+        return
+
+    try:
+        png, total, marked = _cached_pdf_page(
+            str(local_pdf), local_pdf.stat().st_mtime_ns, page_number, excerpt
+        )
+        st.caption(f"{document_name} · Página {page_number} de {total}")
+        if excerpt:
+            if marked:
+                st.caption("Pasaje citado resaltado en amarillo.")
+            else:
+                st.info("No se pudo localizar literalmente el extracto en esta página. Comprueba el pasaje original.")
+        # La imagen se ajusta al espacio visible del modal, manteniendo la
+        # proporción de la hoja y sin exigir desplazarse por una página ampliada.
+        import base64
+        encoded = base64.b64encode(png).decode("ascii")
+        st.markdown(
+            '<div style="display:flex;justify-content:center;width:100%;">'
+            '<img alt="Página citada del documento normativo" '
+            'style="display:block;max-width:100%;max-height:65vh;object-fit:contain;'
+            'width:auto;height:auto;" '
+            f'src="data:image/png;base64,{encoded}">'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        st.error(f"No se pudo visualizar esta página: {exc}")
 
 # ── CARGA SILENCIOSA DE CREDENCIALES (Sin mostrar en la interfaz) ───────────────
 api_key = os.getenv("OPENAI_API_KEY", "") or os.getenv("openai_api_key", "")
@@ -325,6 +367,25 @@ html,
     background: #E0E7FF;
     text-decoration: none;
 }
+
+/* Botón Ver página: estilo secundario armonizado con el enlace de Drive. */
+.st-key-open_pdf_modal_1 button,
+[class*="st-key-open_pdf_modal_"] button {
+    color: #1967D2 !important;
+    background: #F0F7FF !important;
+    border: 1px solid #DBEAFE !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;
+    min-height: 34px !important;
+    transition: background 0.15s ease !important;
+}
+[class*="st-key-open_pdf_modal_"] button:hover {
+    color: #174EA6 !important;
+    background: #E0E7FF !important;
+    border-color: #BFDBFE !important;
+}
+/* Enlace original de Drive: el estilo drive-link no se modifica. */
 
 /* Razonamiento */
 .reason-box {
@@ -814,14 +875,37 @@ else:
                 </div>
               </div>
               {f'<div class="cite-excerpt">“{extracto}”</div>' if extracto else ''}
-              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-                <a href="{doc_drive_url}" target="_blank" rel="noopener noreferrer" class="drive-link">
-                  {SVG["drive"]} Abrir archivo en Google Drive
-                </a>
-                {f'<span style="font-size:0.74rem;color:#64748B;display:inline-flex;align-items:center;gap:4px">{SVG["pin"]} Página del PDF: <b>{pagina}</b></span>' if pagina else ''}
-              </div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Acciones lado a lado: documento original y vista de la página citada.
+            try:
+                physical_page = int(c.get("pagina"))
+                valid_page = physical_page >= 1
+            except (ValueError, TypeError):
+                valid_page = False
+                physical_page = None
+
+            col_drive, col_preview = st.columns(2, gap="small")
+            with col_drive:
+                # Conserva el enlace y estilo institucional original de Drive.
+                st.markdown(
+                    f'<div style="padding-top:3px;">'
+                    f'<a href="{doc_drive_url}" target="_blank" '
+                    f'rel="noopener noreferrer" class="drive-link">'
+                    f'{SVG["drive"]} Abrir archivo en Google Drive</a></div>',
+                    unsafe_allow_html=True,
+                )
+            with col_preview:
+                if valid_page and doc_name.lower().endswith(".pdf"):
+                    if st.button(
+                        f"Ver página {physical_page}",
+                        key=f"open_pdf_modal_{num}",
+                        use_container_width=True,
+                    ):
+                        show_pdf_dialog(doc_name, physical_page, str(c.get("extracto", "")))
+                else:
+                    st.caption("Vista local no disponible")
 
 # ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
 st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)

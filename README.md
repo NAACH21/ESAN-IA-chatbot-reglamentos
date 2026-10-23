@@ -43,3 +43,12 @@ Se abrirá automáticamente en tu navegador web en: `http://localhost:8501`
 * `ingest.py`: Extracción de texto de PDFs (`pypdf`), chunking y generación de embeddings (`text-embedding-3-small`).
 * `DOCS/`: Carpeta con los 10 reglamentos oficiales en formato PDF.
 * `chroma_db/`: Base de datos vectorial persistente generada localmente.
+
+## 🔎 Control de citas (actualización)
+
+Ver [`MEJORAS_CITAS.md`](MEJORAS_CITAS.md) para el flujo de citas textualmente verificadas,
+control de duplicados, diferencias entre programas, pruebas locales y límites de la validación.
+
+```bash
+python -m unittest discover -s tests -v
+```

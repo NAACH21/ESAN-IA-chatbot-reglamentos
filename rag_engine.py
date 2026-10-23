@@ -13,6 +13,7 @@ except ImportError:
 
 import chromadb
 from ingest import detect_section_or_article
+from citation_utils import normalize, validate_citations, infer_program_scope, source_applies_to_scope, link_claims_to_citations
 
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 COLLECTION_NAME = "esan_reglamentos"
@@ -38,7 +39,7 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves:
 {
   "dictamen_coordinacion": {
     "procedencia": "string — 'Procede conforme a reglamento' | 'No procede conforme a reglamento' | 'Caso no contemplado expresamente — Requiere elevación'",
-    "resumen_ejecutivo": "string — dictamen ejecutivo directo para la coordinadora: qué resuelve la norma ante este caso y qué criterio debe aplicar la institución."
+    "resumen_ejecutivo": "string — síntesis ejecutiva breve de la decisión; no repitas las afirmaciones detalladas cuando ya estén en afirmaciones_citadas."
   },
   "requiere_aprobacion": "string — instancia competente que debe resolver o validar formalmente (ej: 'Profesor del curso', 'Dirección del Programa', 'Secretaría Académica', 'Comité Académico', 'La coordinadora puede resolver directamente')",
   "acciones_coordinadora": [
@@ -52,13 +53,13 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves:
      - Si hay requisitos o pasos específicos para el estudiante, preséntalos con viñetas limpias.
      - Cierre formal firmado por 'Coordinación Académica - Universidad ESAN'.
      - REGLA CRÍTICA DE ESTILO: NO uses encabezados robóticos numerados (NO escribas '1. Diagnóstico de su consulta', '2. Fundamentación normativa', '3. Procedimiento', '2.1, 2.2', etc.). Redacta un correo institucional auténtico.",
+  "afirmaciones_citadas": [
+    {"texto": "afirmación normativa principal, breve, autosuficiente y directamente relevante para responder la consulta", "cita_indices": [1]}
+  ],
   "citas_normativas": [
     {
-      "numero": 1,
-      "documento": "nombre exacto del archivo PDF o documento",
-      "seccion": "Artículo, Capítulo o Directiva identificada",
-      "pagina": "número de página o sección",
-      "extracto": "frase textual literal del documento que fundamenta la decisión (máx. 200 caracteres)"
+      "fragmento_id": "F1",
+      "extracto": "copia LITERAL de la disposición relevante del fragmento indicado (máx. 200 caracteres)"
     }
   ]
 }
@@ -78,8 +79,38 @@ REGLAS ABSOLUTAS:
    - NO incluyas corchetes numéricos como [1] o [2] en el borrador para el alumno (las citas técnicas van en 'citas_normativas' para la coordinadora).
    - NO uses numeraciones rígidas de plantilla como '1. Diagnóstico', '2. Fundamentación normativa', '2.1', 'Paso 1, Paso 2'. Redáctalo con fluidez profesional.
 
-4. DIVERSIDAD DE CITAS:
-   En 'citas_normativas', cada cita debe referir a un artículo o regla distinta. No repitas la misma cita 4 veces con fragmentos de la misma frase.
+4. CITAS TRAZABLES Y MÍNIMAS:
+   - Cada cita DEBE usar el identificador F1, F2, etc., de un fragmento entregado.
+   - Copia literalmente la oración o cláusula que fundamenta una afirmación concreta.
+   - No inventes documento, página, artículo, sección ni extracto: esos metadatos se asignan por código.
+   - Una misma regla = una sola cita, aunque se repita en varios fragmentos.
+   - Pueden existir DOS citas de la misma página si sustentan reglas realmente distintas.
+   - No rellenes una cuota de citas; elige solo las indispensables. Devuelve [] si no hay sustento literal.
+   - Nunca cites un reglamento de Doctorado para acreditar el procedimiento de un Diploma de Educación Ejecutiva, ni viceversa.
+   - En afirmaciones_citadas incluye SOLO los fundamentos imprescindibles para responder la pregunta; evita requisitos secundarios no solicitados.
+   - Estas afirmaciones conformarán el criterio resolutivo mostrado a la coordinadora: deben ser comprensibles sin un segundo párrafo y no debes repetirlas en otro bloque.
+   - cita_indices se refiere a las posiciones 1, 2, 3... de citas_normativas PROPUESTAS, NO a F1/F2.
+   - Cada afirmación debe referir a una o más citas que realmente la respalden.
+   - Si no existe sustento textual para una afirmación, no le inventes referencias.
+   - No insertes [1] ni [2] directamente en el resumen; el servidor los incorpora.
+
+
+5. ALCANCE NORMATIVO Y PRUDENCIA:
+   - Distingue: (A) prohibición normativa expresa = 'No procede';
+     (B) ausencia de regulación suficiente = 'Caso no contemplado expresamente — Requiere elevación'.
+     La ausencia de evidencia NO constituye una prohibición normativa.
+   - Si la pregunta no identifica el programa, NO extrapoles reglas de programas distintos:
+     explica que falta identificar Diploma, Doctorado, Maestría, etc., antes del dictamen definitivo.
+   - Un extracto que menciona 'tardanza' NO demuestra por sí solo que exista o no un trámite
+     de 'justificación de inasistencias'. La pertinencia material es obligatoria.
+   - Distingue retiro de un curso y retiro total del programa; no los confundas.
+   - En el dictamen, distingue requisitos normativos de recomendaciones operativas.
+   - La declaración de procedencia siempre está sujeta a comprobar la versión vigente
+     y aplicabilidad del reglamento para el programa del alumno.
+   - No declares que la coordinadora puede resolver directamente si indicas que debe
+     decidir o aprobar la Dirección del Programa.
+   - No trates correos, manuales operativos o documentos administrativos como reglamentos
+     de autoridad normativa sin verificar su carácter, alcance y aprobación.
 """
 
 
@@ -116,7 +147,8 @@ class RAGEngine:
             return 0
         return self.collection.count()
 
-    def search_relevant_chunks(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
+    def search_relevant_chunks(self, query: str, top_k: int = 6,
+                               program_scope: str = None) -> List[Dict[str, Any]]:
         if not self.is_indexed():
             return []
 
@@ -140,6 +172,8 @@ class RAGEngine:
                 results["metadatas"][0],
                 results["distances"][0] if "distances" in results else [0] * fetch_k
             ):
+                if not source_applies_to_scope(meta.get("source", ""), program_scope):
+                    continue
                 section = meta.get("section") or detect_section_or_article(doc_text)
                 raw_candidates.append({
                     "text": doc_text.strip(),
@@ -149,42 +183,41 @@ class RAGEngine:
                     "score": round((1 - dist) * 100, 1) if dist is not None else None
                 })
 
-        # Deduplicación y Consolidación Inteligente de Fragmentos
-        unique_sources = []
-        seen_doc_pages = {}
-
+        # Desduplicación de los fragmentos recuperados: se evita repetir el
+        # mismo texto, sin confundir "misma página" con "misma norma".
+        candidates = []
         for cand in raw_candidates:
-            c_text = cand["text"]
-            c_doc = cand["source"]
-            c_page = str(cand["page"])
-            c_norm = "".join(c_text.lower().split())[:70]
-
-            is_dup = False
-            for s in unique_sources:
-                s_text = s["text"]
-                s_doc = s["source"]
-                s_page = str(s["page"])
-                s_norm = "".join(s_text.lower().split())[:70]
-
-                # Mismo documento y misma página
-                if c_doc == s_doc and c_page == s_page:
-                    if c_norm in s_norm or s_norm in c_norm or (len(c_norm) > 30 and c_norm[:40] == s_norm[:40]):
-                        is_dup = True
-                        if len(c_text) > len(s_text):
-                            s["text"] = c_text
+            candidate_text = normalize(cand["text"])
+            if not candidate_text:
+                continue
+            duplicate = False
+            for prior in candidates:
+                old_text = normalize(prior["text"])
+                if normalize(cand["source"]) == normalize(prior["source"]):
+                    if candidate_text == old_text or (
+                        min(len(candidate_text), len(old_text)) >= 120
+                        and (candidate_text in old_text or old_text in candidate_text)
+                    ):
+                        duplicate = True
                         break
+            if not duplicate:
+                candidates.append(cand)
 
-                # Mismo texto idéntico aunque varíe ligeramente la metadata
-                if c_norm and s_norm and (c_norm in s_norm or s_norm in c_norm):
-                    is_dup = True
+        # Diversificar primero por documento; completar luego con otros pasajes
+        # relevantes del documento dominante cuando no haya suficiente diversidad.
+        unique_sources = []
+        counts = {}
+        for max_per_document in (2, top_k):
+            for cand in candidates:
+                if len(unique_sources) >= top_k:
                     break
-
-            if not is_dup:
-                doc_count = seen_doc_pages.get(c_doc, 0)
-                if doc_count < 2 or len(unique_sources) < top_k:
-                    unique_sources.append(cand)
-                    seen_doc_pages[c_doc] = doc_count + 1
-
+                if cand in unique_sources:
+                    continue
+                name = normalize(cand["source"])
+                if counts.get(name, 0) >= max_per_document:
+                    continue
+                unique_sources.append(cand)
+                counts[name] = counts.get(name, 0) + 1
             if len(unique_sources) >= top_k:
                 break
 
@@ -203,27 +236,48 @@ class RAGEngine:
         parsed_dict incluye: requiere_aprobacion, borrador_alumno,
         acciones_coordinadora, razonamiento, citas_normativas.
         """
-        sources = self.search_relevant_chunks(query, top_k=top_k)
+        # El ámbito indicado en "Contexto extra" también influye en la búsqueda.
+        program_scope = infer_program_scope(query, context_extra)
+        retrieval_query = f"{query}\nPrograma / contexto: {context_extra}" if context_extra else query
+        sources = self.search_relevant_chunks(
+            retrieval_query, top_k=top_k, program_scope=program_scope
+        )
 
         if not sources:
+            indexed = self.is_indexed()
+            message = (
+                "No se recuperaron fragmentos aplicables al ámbito del programa. "
+                "Verifique el programa y la documentación indexada."
+                if indexed else "No se encontraron documentos indexados. Indexe la base documental."
+            )
             empty = {
-                "requiere_aprobacion": "Sin información",
-                "borrador_alumno": "No se encontraron documentos indexados. Por favor indexe la base documental primero.",
-                "acciones_coordinadora": ["Verificar que la base documental esté indexada."],
-                "razonamiento": "La base vectorial está vacía.",
-                "citas_normativas": []
+                "dictamen_coordinacion": {
+                    "procedencia": "Sustento normativo insuficiente — Requiere revisión",
+                    "resumen_ejecutivo": message,
+                },
+                "requiere_aprobacion": "Revisión de normativa por Coordinación/Dirección",
+                "borrador_alumno": "No se dispone de sustento normativo verificable para emitir una respuesta al estudiante.",
+                "acciones_coordinadora": ["Verificar el programa académico y los reglamentos indexados."],
+                "razonamiento": message,
+                "citas_normativas": [],
+                "auditoria_citas": {"propuestas": 0, "duplicadas": 0, "no_verificables": 0, "aceptadas": 0},
+                "validacion_pendiente": True,
             }
             return empty, []
 
         context_parts = []
         for i, s in enumerate(sources, 1):
             context_parts.append(
-                f"[FRAGMENTO #{i} | {s['source']} | {s['section']} | Pág. {s['page']}]:\n{s['text']}"
+                f"[F{i} | documento: {s['source']} | sección: {s['section']} | página: {s['page']}]:\n{s['text']}"
             )
         context_str = "\n---\n".join(context_parts)
 
-        user_content = f"""FRAGMENTOS NORMATIVOS VERIFICADOS:
+        user_content = f"""FRAGMENTOS DOCUMENTALES RECUPERADOS (pueden incluir documentos no normativos;
+la búsqueda por similitud NO acredita vigencia ni pertinencia):
 {context_str}
+
+ALCANCE DEL PROGRAMA:
+{program_scope or 'NO IDENTIFICADO: evita una decisión categórica si depende de saber el programa.'}
 
 CONSULTA DE LA COORDINADORA:
 Mensaje del alumno: {query}
@@ -253,11 +307,16 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
 
         raw = ""
         try:
+            max_output_tokens = (
+                6000 if model_cfg["provider"] == "openrouter"
+                else 2500
+            )
+
             kwargs = dict(
                 model=model_cfg["model_id"],
                 messages=messages,
                 temperature=0.15,
-                max_tokens=2000,
+                max_tokens=max_output_tokens,
                 response_format={"type": "json_object"},
             )
             try:
@@ -268,6 +327,41 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 response = client.chat.completions.create(**kwargs)
 
             raw = response.choices[0].message.content.strip()
+            if response.choices[0].finish_reason == "length":
+                print(
+                    "[RAG] ERROR: el modelo alcanzó el límite "
+                    "de generación antes de completar su respuesta."
+                )
+
+                return {
+                    "dictamen_coordinacion": {
+                        "procedencia": "Error técnico — Respuesta incompleta",
+                        "resumen_ejecutivo": (
+                            "El modelo no completó la generación "
+                            "del dictamen. Esto no demuestra "
+                            "insuficiencia normativa."
+                        )
+                    },
+                    "requiere_aprobacion": "No determinado",
+                    "acciones_coordinadora": [
+                        "Reintentar la consulta tras ajustar "
+                        "el límite de generación."
+                    ],
+                    "razonamiento": (
+                        "La generación fue interrumpida "
+                        "por el límite de tokens."
+                    ),
+                    "borrador_alumno": "",
+                    "citas_normativas": [],
+                    "auditoria_citas": {
+                        "propuestas": 0,
+                        "duplicadas": 0,
+                        "no_verificables": 0,
+                        "aceptadas": 0
+                    },
+                    "validacion_pendiente": True,
+                    "error_tecnico": "generation_length"
+                }, sources
         except Exception as api_err:
             return {
                 "requiere_aprobacion": "Error de comunicación con la API",
@@ -301,8 +395,10 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             p = json.loads(candidate, strict=False)
             if isinstance(p, dict):
                 parsed = p
-        except Exception:
-            pass
+        except json.JSONDecodeError as e:
+            print(f"[RAG] JSON inválido: {e.msg} (línea {e.lineno}, columna {e.colno})")
+        except Exception as e:
+            print(f"[RAG] Error inesperado en JSON: {type(e).__name__}: {e}")
 
         # 4. Intento 2: Limpieza de comas finales (trailing commas)
         if not parsed:
@@ -318,9 +414,30 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             """Decodifica escapes sin alterar caracteres UTF-8 ni tildes."""
             return s.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
 
-        # 5. Intento 3: Extracción regex de campos clave conservando tildes y caracteres UTF-8
+        # 5. Rescate de campos cuando la respuesta completa no es JSON válido.
+        # Se conservan las citas estructuradas: no se aceptan por defecto;
+        # validate_citations comprueba posteriormente su literalidad y origen.
         if not parsed:
-            parsed = {}
+            parsed = {"citas_normativas": []}
+            match_citas = _re.search(r'"citas_normativas"\s*:\s*\[', candidate)
+            if match_citas:
+                decoder = json.JSONDecoder(strict=False)
+                pos = match_citas.end()
+                while pos < len(candidate):
+                    while pos < len(candidate) and candidate[pos] in " \t\r\n,":
+                        pos += 1
+                    if pos >= len(candidate) or candidate[pos] == "]":
+                        break
+                    try:
+                        cita, consumed = decoder.raw_decode(candidate[pos:])
+                    except json.JSONDecodeError as e:
+                        print(f"[RAG] Cita no recuperable en posición {pos}: {e.msg}")
+                        break
+                    if (isinstance(cita, dict)
+                            and isinstance(cita.get("fragmento_id"), str)
+                            and isinstance(cita.get("extracto"), str)):
+                        parsed["citas_normativas"].append(cita)
+                    pos += consumed
 
             # Extracción robusta de borrador_alumno (tolera comillas internas sin escapar de MiMo)
             m_draft = _re.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', candidate, _re.DOTALL)
@@ -421,20 +538,66 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         else:
             parsed["borrador_alumno"] = ""
 
-        # 9. Normalizar y deduplicar citas_normativas
-        raw_citas = parsed.get("citas_normativas", [])
-        clean_citas = []
-        seen_keys = set()
-        for idx_c, c in enumerate(raw_citas if isinstance(raw_citas, list) else [], 1):
-            if isinstance(c, dict):
-                doc_name = c.get("documento", "")
-                extract = c.get("extracto", "")[:60].strip()
-                key = f"{doc_name}::{extract}"
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    c["numero"] = len(clean_citas) + 1
-                    clean_citas.append(c)
 
-        parsed["citas_normativas"] = clean_citas
+        # 9. Citas trazables: el servidor verifica extracto y asigna página/documento.
+        citas, auditoria = validate_citations(parsed.get("citas_normativas", []), sources)
+
+
+
+
+
+
+        # Resolver relaciones usando índices de citas propuestas antes de reemplazarlas.
+        parsed["afirmaciones_citadas_validadas"] = link_claims_to_citations(
+            parsed.get("afirmaciones_citadas", []),
+            parsed.get("citas_normativas", []), citas, sources
+        )
+        parsed["citas_normativas"] = citas
+        parsed["auditoria_citas"] = auditoria
+        parsed["validacion_pendiente"] = not bool(citas)
+        # Preguntas generales sobre faltas/retiros sin programa identificado
+        # no se convierten automáticamente en prohibiciones universales.
+        consulta_norm = normalize(query)
+        falta_ambito = (not program_scope and any(
+            palabra in consulta_norm for palabra in ("inasistencia", "justific", "tardanza", "retiro")
+        ))
+        if falta_ambito:
+            parsed["validacion_pendiente"] = True
+            dictamen = parsed.get("dictamen_coordinacion", {})
+            if isinstance(dictamen, dict):
+                dictamen["procedencia"] = "Alcance del programa no identificado — Requiere validación"
+                dictamen["resumen_ejecutivo"] = (
+                    "Antes de emitir un dictamen definitivo debe identificarse el programa "
+                    "del estudiante y el reglamento aplicable. "
+                    + str(dictamen.get("resumen_ejecutivo", ""))
+                )
+            parsed["requiere_aprobacion"] = "Identificar el programa y validar la norma con su Dirección"
+            # No mostrar al alumno un rechazo universal generado para un caso ambiguo.
+            parsed["borrador_alumno"] = (
+                "Estimado(a) estudiante,\n\n"
+                "Para orientarle correctamente, necesitamos confirmar a qué programa "
+                "académico pertenece su consulta. Las disposiciones aplicables pueden "
+                "variar según el reglamento del programa. Una vez confirmado, "
+                "podremos revisar el procedimiento pertinente.\n\n"
+                "Atentamente,\nCoordinación Académica - Universidad ESAN"
+            )
+        if not citas:
+            parsed["afirmaciones_citadas_validadas"] = []
+            # Un dictamen categórico sin evidencia verificable no se muestra como
+            # decisión concluida. El borrador queda sujeto a revisión manual.
+            dictamen = parsed.get("dictamen_coordinacion", {})
+            if isinstance(dictamen, dict):
+                dictamen["procedencia"] = "Sustento normativo insuficiente — Requiere revisión"
+            parsed["requiere_aprobacion"] = "Validación normativa de la Dirección del Programa"
+            if not falta_ambito:
+                parsed["borrador_alumno"] = (
+                    "Estimado(a) estudiante,\n\n"
+                    "Su consulta requiere una verificación adicional de la normativa "
+                    "aplicable. No podemos confirmar todavía el procedimiento o la "
+                    "decisión institucional correspondiente. La Coordinación "
+                    "Académica revisará los documentos y el programa pertinente "
+                    "antes de emitir una respuesta formal.\n\n"
+                    "Atentamente,\nCoordinación Académica - Universidad ESAN"
+                )
         return parsed, sources
 

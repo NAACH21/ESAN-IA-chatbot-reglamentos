@@ -13,7 +13,7 @@ except ImportError:
 
 import chromadb
 from ingest import detect_section_or_article
-from citation_utils import normalize, validate_citations, infer_program_scope, source_applies_to_scope
+from citation_utils import normalize, validate_citations, infer_program_scope, source_applies_to_scope, link_claims_to_citations
 
 CHROMA_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 COLLECTION_NAME = "esan_reglamentos"
@@ -39,7 +39,7 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves:
 {
   "dictamen_coordinacion": {
     "procedencia": "string — 'Procede conforme a reglamento' | 'No procede conforme a reglamento' | 'Caso no contemplado expresamente — Requiere elevación'",
-    "resumen_ejecutivo": "string — dictamen ejecutivo directo para la coordinadora: qué resuelve la norma ante este caso y qué criterio debe aplicar la institución."
+    "resumen_ejecutivo": "string — síntesis ejecutiva breve de la decisión; no repitas las afirmaciones detalladas cuando ya estén en afirmaciones_citadas."
   },
   "requiere_aprobacion": "string — instancia competente que debe resolver o validar formalmente (ej: 'Profesor del curso', 'Dirección del Programa', 'Secretaría Académica', 'Comité Académico', 'La coordinadora puede resolver directamente')",
   "acciones_coordinadora": [
@@ -53,6 +53,9 @@ Responde SIEMPRE en formato JSON estricto con las siguientes claves:
      - Si hay requisitos o pasos específicos para el estudiante, preséntalos con viñetas limpias.
      - Cierre formal firmado por 'Coordinación Académica - Universidad ESAN'.
      - REGLA CRÍTICA DE ESTILO: NO uses encabezados robóticos numerados (NO escribas '1. Diagnóstico de su consulta', '2. Fundamentación normativa', '3. Procedimiento', '2.1, 2.2', etc.). Redacta un correo institucional auténtico.",
+  "afirmaciones_citadas": [
+    {"texto": "afirmación normativa principal, breve, autosuficiente y directamente relevante para responder la consulta", "cita_indices": [1]}
+  ],
   "citas_normativas": [
     {
       "fragmento_id": "F1",
@@ -84,6 +87,13 @@ REGLAS ABSOLUTAS:
    - Pueden existir DOS citas de la misma página si sustentan reglas realmente distintas.
    - No rellenes una cuota de citas; elige solo las indispensables. Devuelve [] si no hay sustento literal.
    - Nunca cites un reglamento de Doctorado para acreditar el procedimiento de un Diploma de Educación Ejecutiva, ni viceversa.
+   - En afirmaciones_citadas incluye SOLO los fundamentos imprescindibles para responder la pregunta; evita requisitos secundarios no solicitados.
+   - Estas afirmaciones conformarán el criterio resolutivo mostrado a la coordinadora: deben ser comprensibles sin un segundo párrafo y no debes repetirlas en otro bloque.
+   - cita_indices se refiere a las posiciones 1, 2, 3... de citas_normativas PROPUESTAS, NO a F1/F2.
+   - Cada afirmación debe referir a una o más citas que realmente la respalden.
+   - Si no existe sustento textual para una afirmación, no le inventes referencias.
+   - No insertes [1] ni [2] directamente en el resumen; el servidor los incorpora.
+
 
 5. ALCANCE NORMATIVO Y PRUDENCIA:
    - Distingue: (A) prohibición normativa expresa = 'No procede';
@@ -579,6 +589,11 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
 
 
 
+        # Resolver relaciones usando índices de citas propuestas antes de reemplazarlas.
+        parsed["afirmaciones_citadas_validadas"] = link_claims_to_citations(
+            parsed.get("afirmaciones_citadas", []),
+            parsed.get("citas_normativas", []), citas, sources
+        )
         parsed["citas_normativas"] = citas
         parsed["auditoria_citas"] = auditoria
         parsed["validacion_pendiente"] = not bool(citas)
@@ -609,6 +624,7 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 "Atentamente,\nCoordinación Académica - Universidad ESAN"
             )
         if not citas:
+            parsed["afirmaciones_citadas_validadas"] = []
             # Un dictamen categórico sin evidencia verificable no se muestra como
             # decisión concluida. El borrador queda sujeto a revisión manual.
             dictamen = parsed.get("dictamen_coordinacion", {})

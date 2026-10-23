@@ -147,6 +147,62 @@ def validate_citations(
     return accepted, stats
 
 
+
+
+def link_claims_to_citations(claims: Any, proposed: Any,
+                             accepted: List[Dict[str, Any]],
+                             sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Relaciona afirmaciones con citas *ya verificadas* sin inventar referencias.
+
+    `cita_indices` son índices 1-based de `citas_normativas` PROPUESTAS.
+    La numeración final pertenece a `accepted`, incluso si hubo deduplicación.
+    No asume que un fragmento completo constituye una única cita.
+    """
+    if not isinstance(claims, list) or not isinstance(proposed, list):
+        return []
+    source_by_id = {f"F{i}": src for i, src in enumerate(sources, 1)}
+    proposal_to_number = {}
+    for i, proposal in enumerate(proposed, 1):
+        if not isinstance(proposal, dict):
+            continue
+        frag = str(proposal.get("fragmento_id", "")).strip().upper()
+        src = source_by_id.get(frag)
+        if src is None:
+            continue
+        match = locate_literal_quote(str(proposal.get("extracto") or ""), str(src.get("text", "")))
+        if match is None:
+            continue
+        candidate = {"documento": src.get("source", ""),
+                     "pagina": str(src.get("page", "")), "extracto": match[0]}
+        for citation in accepted:
+            if _similar_evidence(candidate, citation):
+                proposal_to_number[i] = citation["numero"]
+                break
+
+    linked = []
+    for claim in claims[:12]:
+        if not isinstance(claim, dict):
+            continue
+        statement = str(claim.get("texto") or "").strip()
+        indices = claim.get("cita_indices", [])
+        if not statement or len(statement) > 650 or not isinstance(indices, list):
+            continue
+        nums = []
+        for idx in indices:
+            if isinstance(idx, bool):
+                continue
+            try:
+                index = int(idx)
+            except (TypeError, ValueError):
+                continue
+            num = proposal_to_number.get(index)
+            if num and num not in nums:
+                nums.append(num)
+        if nums:
+            linked.append({"texto": statement, "numeros": nums})
+    return linked
+
+
 def infer_program_scope(question: str, context_extra: str = "") -> Optional[str]:
     """Detecta ámbitos inequívocos. No intenta adivinar el programa ausente."""
     text = normalize(f"{question} {context_extra}")

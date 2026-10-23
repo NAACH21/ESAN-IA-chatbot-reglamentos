@@ -362,10 +362,6 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                     "validacion_pendiente": True,
                     "error_tecnico": "generation_length"
                 }, sources
-            print("\n=== ESTADO DE GENERACION ===")
-            print("Modelo:", model_cfg["model_id"])
-            print("Motivo de finalización:", response.choices[0].finish_reason)
-            print("Caracteres recibidos:", len(raw))
         except Exception as api_err:
             return {
                 "requiere_aprobacion": "Error de comunicación con la API",
@@ -401,8 +397,6 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                 parsed = p
         except json.JSONDecodeError as e:
             print(f"[RAG] JSON inválido: {e.msg} (línea {e.lineno}, columna {e.colno})")
-            if os.getenv("RAG_DEBUG_JSON") == "1":
-                print("Contexto:", repr(candidate[max(0, e.pos - 80):e.pos + 80]))
         except Exception as e:
             print(f"[RAG] Error inesperado en JSON: {type(e).__name__}: {e}")
 
@@ -424,11 +418,6 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
         # Se conservan las citas estructuradas: no se aceptan por defecto;
         # validate_citations comprueba posteriormente su literalidad y origen.
         if not parsed:
-            print("[RAG] Activado parseo alternativo de JSON; caracteres:", len(raw))
-            if os.getenv("RAG_DEBUG_JSON") == "1":
-                print("Inicio:", repr(raw[:250]))
-                print("Final:", repr(raw[-350:]))
-
             parsed = {"citas_normativas": []}
             match_citas = _re.search(r'"citas_normativas"\s*:\s*\[', candidate)
             if match_citas:
@@ -449,7 +438,6 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
                             and isinstance(cita.get("extracto"), str)):
                         parsed["citas_normativas"].append(cita)
                     pos += consumed
-            print("[RAG] Citas rescatadas del JSON alternativo:", len(parsed["citas_normativas"]))
 
             # Extracción robusta de borrador_alumno (tolera comillas internas sin escapar de MiMo)
             m_draft = _re.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', candidate, _re.DOTALL)
@@ -551,40 +539,10 @@ Genera la respuesta estructurada en JSON estricto como se indicó en el system p
             parsed["borrador_alumno"] = ""
 
 
-        print("\n=== RESPUESTA INTERPRETADA ===")
-
-        print("Tipo de respuesta:", type(parsed).__name__)
-
-        print(
-            "Campos encontrados:",
-            list(parsed.keys()) if isinstance(parsed, dict) else "No es dict"
-        )
-
-        print(
-            "Citas originales:",
-            repr(parsed.get("citas_normativas", "CAMPO AUSENTE"))
-            if isinstance(parsed, dict)
-            else "JSON no válido"
-        )
-
         # 9. Citas trazables: el servidor verifica extracto y asigna página/documento.
         citas, auditoria = validate_citations(parsed.get("citas_normativas", []), sources)
 
 
-        print("\n=== DIAGNOSTICO DE CITAS ===")
-
-        print("CITAS PROPUESTAS:", len(parsed.get("citas_normativas", [])))
-        if os.getenv("RAG_DEBUG_JSON") == "1":
-            print(json.dumps(parsed.get("citas_normativas", []), ensure_ascii=False, indent=2))
-
-        print("AUDITORIA:")
-        print(json.dumps(
-            auditoria,
-            ensure_ascii=False,
-            indent=2
-        ))
-
-        print("CITAS ACEPTADAS:", len(citas))
 
 
 

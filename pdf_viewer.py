@@ -133,17 +133,16 @@ def clean_search_term(raw_text: str) -> str:
     if not raw_text:
         return ""
     t = raw_text.strip()
-    t = re.sub(r'^["\'“«]+|["\'”»]+$', '', t)
-    t = re.sub(r'\.{3,}', '', t)
+    t = t.strip(' "\'“”«»')
+    t = re.sub(r'\.{2,}', '', t)
     t = re.sub(r'\s+', ' ', t).strip()
-    # Tomar un fragmento significativo si es muy largo (máximo ~120 caracteres para búsqueda precisa)
-    if len(t) > 120:
-        # Cortar en el último espacio antes de 120
-        idx = t[:120].rfind(" ")
-        if idx > 40:
+    # Tomar una frase inicial significativa (máximo ~85 caracteres para búsqueda precisa sin cortes)
+    if len(t) > 85:
+        idx = t[:85].rfind(" ")
+        if idx > 30:
             t = t[:idx]
         else:
-            t = t[:120]
+            t = t[:85]
     return t
 
 
@@ -241,20 +240,15 @@ def generate_pdf_viewer_html(
     .textLayer {{
       opacity: 1 !important;
     }}
-    /* Subrayado y resaltado institucional de alta visibilidad */
+    /* Resaltado de frase continuo en amarillo con acento ESAN */
     mark.pdf-highlight {{
-      background: #FEF08A !important;
+      background-color: #FEF08A !important;
       color: #0F172A !important;
       border-bottom: 2.5px solid #D31418 !important;
-      box-shadow: 0 0 0 2px rgba(211, 20, 24, 0.45) !important;
       border-radius: 2px !important;
-      padding: 1px 0 !important;
-      font-weight: 700 !important;
-      animation: pulse-glow 2s ease-in-out infinite alternate;
-    }}
-    @keyframes pulse-glow {{
-      from {{ background-color: #FEF08A; }}
-      to {{ background-color: #FDE047; }}
+      padding: 2px 1px !important;
+      font-weight: 600 !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
     }}
     .loading-overlay {{
       color: #FFFFFF; font-size: 0.88rem; font-weight: 600;
@@ -293,7 +287,7 @@ def generate_pdf_viewer_html(
   <!-- AVISO DE TEXTO RESALTADO -->
   <div class="search-alert-bar" id="search-bar" style="display: none;">
     <div class="search-alert-text">
-      <span>🎯 <b>Fragmento normativo resaltado:</b> <i id="query-preview"></i></span>
+      <span>🎯 <b>Fragmento normativo buscado:</b> <i id="query-preview"></i></span>
     </div>
     <span style="font-weight:700; color:#B45309; font-size:0.73rem;" id="match-status">Buscando...</span>
   </div>
@@ -390,29 +384,60 @@ def generate_pdf_viewer_html(
       }});
       await textLayer.promise;
 
-      // 3. Subrayar y resaltar el fragmento con Mark.js
+      // 3. Subrayar y resaltar el fragmento con Mark.js (frase exacta o subfrases consecutivas, cero palabras sueltas)
       if (targetQuery && targetQuery.trim().length > 0) {{
+        const cleanQ = targetQuery.trim().replace(/^["'“”«»]+|["'“”«»]+$/g, "").replace(/\.{2,}/g, "").trim();
         const markInst = new Mark(textLayerDiv);
-        markInst.mark(targetQuery.trim(), {{
+
+        // Paso 1: Intentar frase completa continua a través de spans del PDF
+        markInst.mark(cleanQ, {{
           className: "pdf-highlight",
           separateWordSearch: false,
+          acrossElements: true,
           diacritics: true,
+          accuracy: "partially",
           done: function(count) {{
-            if (count === 0) {{
-              // Si la frase exacta no coincide por saltos de línea o espacios de OCR,
-              // buscar por palabras clave significativas (> 3 letras)
-              const words = targetQuery.trim().split(/\\s+/).filter(w => w.length > 3);
-              markInst.mark(words, {{
+            if (count > 0) {{
+              updateMatchStatus(count);
+              scrollToHighlight();
+              return;
+            }}
+
+            // Paso 2: Si la frase completa no coincide por saltos de línea con guión,
+            // buscar las primeras 5 a 6 palabras consecutivas de la cita (nunca palabras sueltas aisladas)
+            const words = cleanQ.split(/\s+/).filter(w => w.length > 0);
+            if (words.length >= 4) {{
+              const subPhrase1 = words.slice(0, 5).join(" ");
+              markInst.mark(subPhrase1, {{
                 className: "pdf-highlight",
+                separateWordSearch: false,
+                acrossElements: true,
                 diacritics: true,
-                done: function(cntWords) {{
-                  updateMatchStatus(cntWords);
-                  scrollToHighlight();
+                done: function(subCount1) {{
+                  if (subCount1 > 0) {{
+                    updateMatchStatus(subCount1);
+                    scrollToHighlight();
+                    return;
+                  }}
+                  if (words.length >= 8) {{
+                    const subPhrase2 = words.slice(3, 8).join(" ");
+                    markInst.mark(subPhrase2, {{
+                      className: "pdf-highlight",
+                      separateWordSearch: false,
+                      acrossElements: true,
+                      diacritics: true,
+                      done: function(subCount2) {{
+                        updateMatchStatus(subCount2);
+                        if (subCount2 > 0) scrollToHighlight();
+                      }}
+                    }});
+                  }} else {{
+                    updateMatchStatus(0);
+                  }}
                 }}
               }});
             }} else {{
-              updateMatchStatus(count);
-              scrollToHighlight();
+              updateMatchStatus(0);
             }}
           }}
         }});
@@ -428,7 +453,7 @@ def generate_pdf_viewer_html(
         stEl.textContent = "✓ Resaltado en página";
         stEl.style.color = "#15803D";
       }} else {{
-        stEl.textContent = "Revisar contexto de página";
+        stEl.textContent = "Revise el contexto de la página";
         stEl.style.color = "#94A3B8";
       }}
     }}

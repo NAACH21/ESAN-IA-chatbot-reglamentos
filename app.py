@@ -864,7 +864,7 @@ else:
                     "extracto": s["text"][:220],
                 }
 
-        # ── Deduplicar por documento: agrupar secciones / páginas / extractos del mismo archivo ──
+        # ── Agrupar citas por documento (todas las citas y recuadros en una sola tarjeta por archivo) ──
         import unicodedata as _ud
 
         def _norm_docname(name):
@@ -872,13 +872,12 @@ else:
             n = "".join(c for c in n if _ud.category(c) != "Mn")
             return n.strip()
 
-        grouped = {}   # key = norm_docname -> dict con data
-        order = []     # mantiene orden de primera aparición
+        grouped = {}   # key = norm_docname -> dict con info del doc y lista de citas
+        order = []
         for num, c in sorted(raw_items.items()):
             doc_name_raw = c.get("documento", "")
             nkey = _norm_docname(doc_name_raw)
             if nkey not in grouped:
-                # Resolver fallback desde fuente real de ChromaDB
                 fb_src = ""
                 fb_pg = ""
                 if isinstance(num, int) and 1 <= num <= len(sources):
@@ -887,96 +886,92 @@ else:
                 grouped[nkey] = {
                     "doc_name": doc_name_raw or fb_src,
                     "fallback_source": fb_src,
-                    "pages": [],
-                    "secciones": [],
-                    "extractos": [],
-                    "nums": [],
+                    "citas": [],
                 }
                 order.append(nkey)
+
             grp = grouped[nkey]
-            p = c.get("pagina", "") or (fb_pg if nkey == _norm_docname(doc_name_raw) else "")
-            if p and p not in grp["pages"]:
-                grp["pages"].append(p)
-            s_txt = c.get("seccion", "")
-            if s_txt and s_txt not in grp["secciones"]:
-                grp["secciones"].append(s_txt)
-            ex = c.get("extracto", "")
-            if ex and ex not in grp["extractos"]:
-                grp["extractos"].append(ex)
-            grp["nums"].append(num)
+            # Extraer solo el número de página limpio (sin duplicar "Pág.")
+            p_raw = c.get("pagina", "")
+            p_digits = re.findall(r"\d+", str(p_raw))
+            clean_p = p_digits[0] if p_digits else str(p_raw).strip()
+
+            grp["citas"].append({
+                "num": num,
+                "seccion": c.get("seccion", ""),
+                "pagina": clean_p,
+                "extracto": c.get("extracto", ""),
+            })
 
         for card_idx, nkey in enumerate(order, 1):
             grp = grouped[nkey]
             doc_name = grp["doc_name"]
             fallback_source = grp["fallback_source"]
-            all_pages = grp["pages"]
-            all_secciones = grp["secciones"]
-            all_extractos = grp["extractos"]
-
-            # Página principal para abrir el visor (la primera mencionada)
-            eff_page = all_pages[0] if all_pages else fallback_source and ""
-
-            # Badge con todas las páginas del mismo documento
-            if all_pages:
-                pages_html = " ".join(
-                    f'<span style="background:#FEF2F2;color:#991B1B;padding:1px 7px;border-radius:5px;'
-                    f'font-size:0.71rem;font-weight:700;border:1px solid #FECACA;margin-right:3px">Pág. {pg}</span>'
-                    for pg in all_pages
-                )
-            else:
-                pages_html = ""
-
-            # Extracto (uno por tarjeta, el más representativo)
-            main_extracto = all_extractos[0] if all_extractos else ""
-            main_seccion = " · ".join(all_secciones) if all_secciones else ""
+            all_citas = grp["citas"]
+            first_pg = all_citas[0]["pagina"] if all_citas else ""
 
             doc_drive_url = get_file_drive_url(
                 filename=doc_name,
-                page=eff_page,
+                page=first_pg,
                 fallback_filename=fallback_source,
-                fallback_page=eff_page,
+                fallback_page=first_pg,
             )
 
+            # Tarjeta contenedora única del Documento
             st.markdown(f"""
-            <div class="cite-card" style="margin-bottom:8px">
-              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
-                <span class="cite-num">{card_idx}</span>
-                <div style="flex:1">
-                  <div class="cite-source">{doc_name}</div>
-                  <div class="cite-section" style="margin-top:2px">{main_seccion}</div>
-                  <div style="margin-top:4px">{pages_html}</div>
+            <div class="cite-card" style="margin-bottom:12px; border-left:4px solid #D31418;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span class="cite-num">{card_idx}</span>
+                  <div>
+                    <div class="cite-source">{doc_name}</div>
+                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px">{len(all_citas)} referencia(s) citada(s) en este documento</div>
+                  </div>
                 </div>
+                <a href="{doc_drive_url}" target="_blank" class="drive-link" style="font-size:0.75rem;white-space:nowrap">
+                  {SVG["drive"]} Ver en Drive
+                </a>
               </div>
-              {f'<div class="cite-excerpt">"{main_extracto}..."</div>' if main_extracto else ''}
-            </div>
             """, unsafe_allow_html=True)
 
-            c_act1, c_act2 = st.columns([1.5, 1.1])
-            with c_act1:
+            # Mostrar TODAS las citas / recuadros amarillos de este documento
+            for sub_i, cita in enumerate(all_citas, 1):
+                c_sec = cita["seccion"]
+                c_pg = cita["pagina"]
+                c_ext = cita["extracto"]
+
+                badge_pg = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:5px;font-size:0.72rem;font-weight:700;border:1px solid #FECACA">Pág. {c_pg}</span>' if c_pg else ""
+                sec_text = f'<span style="font-size:0.82rem;font-weight:700;color:#1E293B">{c_sec}</span>' if c_sec else ""
+
+                st.markdown(f"""
+                <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #E2E8F0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                    <div>{sec_text}</div>
+                    <div>{badge_pg}</div>
+                  </div>
+                  {f'<div class="cite-excerpt" style="margin-bottom:8px">"{c_ext}..."</div>' if c_ext else ''}
+                </div>
+                """, unsafe_allow_html=True)
+
+                btn_label = f"🔍 Ver y resaltar en PDF (Pág. {c_pg})" if c_pg else "🔍 Ver y resaltar en PDF"
                 if st.button(
-                    "🔍 Ver y resaltar en PDF",
-                    key=f"btn_pdf_modal_{card_idx}",
+                    btn_label,
+                    key=f"btn_pdf_modal_{card_idx}_{sub_i}_{cita['num']}",
                     use_container_width=True,
                     type="primary",
-                    help="Abre el PDF local oficial directamente en la página con el texto subrayado en amarillo."
+                    help=f"Abre el PDF oficial en la página {c_pg} y resalta este extracto exacto."
                 ):
                     show_pdf_viewer_modal(
                         doc_name=doc_name,
-                        page_val=eff_page,
-                        extracto=main_extracto,
-                        seccion=main_seccion,
+                        page_val=c_pg,
+                        extracto=c_ext,
+                        seccion=c_sec,
                         fallback_source=fallback_source,
                         drive_url=doc_drive_url,
                     )
-            with c_act2:
-                st.markdown(
-                    f'<div style="text-align:right;padding-top:4px">'
-                    f'<a href="{doc_drive_url}" target="_blank" class="drive-link">'
-                    f'{SVG["drive"]} Abrir en Drive'
-                    f'</a></div>',
-                    unsafe_allow_html=True
-                )
-            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
 st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)

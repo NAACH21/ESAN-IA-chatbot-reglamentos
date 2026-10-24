@@ -18,6 +18,9 @@ import rag_engine as _rag_mod
 importlib.reload(_rag_mod)
 import drive_sync as _drive_mod
 importlib.reload(_drive_mod)
+import pdf_viewer as _pdf_mod
+importlib.reload(_pdf_mod)
+from pdf_viewer import resolve_local_doc_path, generate_pdf_viewer_html, parse_page_number
 
 from ingest import (
     build_vector_store,
@@ -528,6 +531,58 @@ with st.sidebar:
         st.session_state.form_id += 1
         st.rerun()
 
+# ── MODAL DIALOG: VISOR NORMATIVO CON PDF.JS Y RESALTADO ─────────────────────
+@st.dialog("Visor Normativo Oficial · Verificación de Cita", width="large")
+def show_pdf_viewer_modal(
+    doc_name: str,
+    page_val: Any,
+    extracto: str,
+    seccion: str,
+    fallback_source: str = "",
+    drive_url: str = "",
+):
+    local_path = resolve_local_doc_path(doc_name, fallback_source=fallback_source)
+    page_int = parse_page_number(page_val)
+
+    if local_path and os.path.exists(local_path):
+        ext = os.path.splitext(local_path)[1].lower()
+        if ext == ".pdf":
+            try:
+                with open(local_path, "rb") as f:
+                    pdf_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+                viewer_html = generate_pdf_viewer_html(
+                    pdf_b64=pdf_b64,
+                    initial_page=page_int,
+                    search_text=extracto,
+                    doc_title=os.path.basename(local_path),
+                    section_name=seccion,
+                )
+                components.html(viewer_html, height=720, scrolling=False)
+            except Exception as e:
+                st.error(f"Error al cargar el documento en el visor: {e}")
+        else:
+            st.info(f"El documento normativo **{os.path.basename(local_path)}** está en formato {ext.upper()}.")
+            if extracto:
+                st.markdown(f"""
+                <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:12px;margin:10px 0">
+                  <div style="font-size:0.78rem;font-weight:700;color:#92400E;margin-bottom:4px">FRAGMENTO TEXTUAL CITADO:</div>
+                  <div style="font-size:0.88rem;color:#1E293B;line-height:1.4">"{extracto}"</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with open(local_path, "rb") as f:
+                st.download_button(
+                    label=f"Descargar archivo local ({os.path.basename(local_path)})",
+                    data=f.read(),
+                    file_name=os.path.basename(local_path),
+                    use_container_width=True
+                )
+    else:
+        st.warning(f"No se encontró copia local de '{doc_name}' en DOCS/. Puedes acceder al archivo en Google Drive:")
+        if drive_url:
+            st.markdown(f'<a href="{drive_url}" target="_blank" class="drive-link">{SVG["drive"]} Abrir documento oficial en Drive</a>', unsafe_allow_html=True)
+
+
 # ── TOP NAVBAR INSTITUCIONAL REIMAGINADO (SIN FORMATO IA DE JUGUETE) ─────────
 # Ancla invisible para scroll-to-top via JS
 st.markdown('<div id="top-anchor"></div>', unsafe_allow_html=True)
@@ -833,7 +888,7 @@ else:
             badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {eff_page}</span>' if eff_page else ""
 
             st.markdown(f"""
-            <div class="cite-card">
+            <div class="cite-card" style="margin-bottom:8px">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
                 <span class="cite-num">{num}</span>
                 <div style="flex:1">
@@ -842,14 +897,35 @@ else:
                 </div>
               </div>
               {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
-              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-                <a href="{doc_drive_url}" target="_blank" class="drive-link">
-                  {SVG["drive"]} Abrir archivo en Google Drive
-                </a>
-                {f'<span style="font-size:0.74rem;color:#64748B;display:inline-flex;align-items:center;gap:4px">{SVG["pin"]} Ubicación: <b>Pág. {pagina}</b></span>' if pagina else ''}
-              </div>
             </div>
             """, unsafe_allow_html=True)
+
+            c_act1, c_act2 = st.columns([1.5, 1.1])
+            with c_act1:
+                if st.button(
+                    "🔍 Ver y resaltar en PDF",
+                    key=f"btn_pdf_modal_{num}",
+                    use_container_width=True,
+                    type="primary",
+                    help="Abre el PDF local oficial directamente en la página con el texto subrayado en amarillo."
+                ):
+                    show_pdf_viewer_modal(
+                        doc_name=doc_name,
+                        page_val=eff_page,
+                        extracto=extracto,
+                        seccion=seccion,
+                        fallback_source=fallback_source,
+                        drive_url=doc_drive_url,
+                    )
+            with c_act2:
+                st.markdown(
+                    f'<div style="text-align:right;padding-top:4px">'
+                    f'<a href="{doc_drive_url}" target="_blank" class="drive-link">'
+                    f'{SVG["drive"]} Abrir en Drive'
+                    f'</a></div>',
+                    unsafe_allow_html=True
+                )
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
 # ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
 st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)

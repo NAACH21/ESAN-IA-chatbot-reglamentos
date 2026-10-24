@@ -849,14 +849,14 @@ else:
         st.markdown(f'<div class="esan-card-title">{SVG["book"]} Respaldo Normativo y Citas ({len(sources)} fuentes)</div>', unsafe_allow_html=True)
 
         citas = result.get("citas_normativas", [])
-        displayed = {}
+        raw_items = {}
         for c in citas:
             num = c.get("numero", 0)
-            displayed[num] = c
+            raw_items[num] = c
 
-        if not displayed:
+        if not raw_items:
             for i_s, s in enumerate(sources[:6], 1):
-                displayed[i_s] = {
+                raw_items[i_s] = {
                     "numero": i_s,
                     "documento": s["source"],
                     "seccion": s["section"],
@@ -864,40 +864,90 @@ else:
                     "extracto": s["text"][:220],
                 }
 
-        for num, c in sorted(displayed.items()):
-            doc_name = c.get("documento", "")
-            seccion = c.get("seccion", "")
-            pagina = c.get("pagina", "")
-            extracto = c.get("extracto", "")
+        # ── Deduplicar por documento: agrupar secciones / páginas / extractos del mismo archivo ──
+        import unicodedata as _ud
 
-            # Si el modelo modificó o parafraseó el nombre, recuperar el archivo real indexado en ChromaDB
-            fallback_source = ""
-            fallback_page = ""
-            if isinstance(num, int) and 1 <= num <= len(sources):
-                fallback_source = sources[num - 1].get("source", "")
-                fallback_page = str(sources[num - 1].get("page", ""))
+        def _norm_docname(name):
+            n = _ud.normalize("NFD", name.lower())
+            n = "".join(c for c in n if _ud.category(c) != "Mn")
+            return n.strip()
+
+        grouped = {}   # key = norm_docname -> dict con data
+        order = []     # mantiene orden de primera aparición
+        for num, c in sorted(raw_items.items()):
+            doc_name_raw = c.get("documento", "")
+            nkey = _norm_docname(doc_name_raw)
+            if nkey not in grouped:
+                # Resolver fallback desde fuente real de ChromaDB
+                fb_src = ""
+                fb_pg = ""
+                if isinstance(num, int) and 1 <= num <= len(sources):
+                    fb_src = sources[num - 1].get("source", "")
+                    fb_pg = str(sources[num - 1].get("page", ""))
+                grouped[nkey] = {
+                    "doc_name": doc_name_raw or fb_src,
+                    "fallback_source": fb_src,
+                    "pages": [],
+                    "secciones": [],
+                    "extractos": [],
+                    "nums": [],
+                }
+                order.append(nkey)
+            grp = grouped[nkey]
+            p = c.get("pagina", "") or (fb_pg if nkey == _norm_docname(doc_name_raw) else "")
+            if p and p not in grp["pages"]:
+                grp["pages"].append(p)
+            s_txt = c.get("seccion", "")
+            if s_txt and s_txt not in grp["secciones"]:
+                grp["secciones"].append(s_txt)
+            ex = c.get("extracto", "")
+            if ex and ex not in grp["extractos"]:
+                grp["extractos"].append(ex)
+            grp["nums"].append(num)
+
+        for card_idx, nkey in enumerate(order, 1):
+            grp = grouped[nkey]
+            doc_name = grp["doc_name"]
+            fallback_source = grp["fallback_source"]
+            all_pages = grp["pages"]
+            all_secciones = grp["secciones"]
+            all_extractos = grp["extractos"]
+
+            # Página principal para abrir el visor (la primera mencionada)
+            eff_page = all_pages[0] if all_pages else fallback_source and ""
+
+            # Badge con todas las páginas del mismo documento
+            if all_pages:
+                pages_html = " ".join(
+                    f'<span style="background:#FEF2F2;color:#991B1B;padding:1px 7px;border-radius:5px;'
+                    f'font-size:0.71rem;font-weight:700;border:1px solid #FECACA;margin-right:3px">Pág. {pg}</span>'
+                    for pg in all_pages
+                )
+            else:
+                pages_html = ""
+
+            # Extracto (uno por tarjeta, el más representativo)
+            main_extracto = all_extractos[0] if all_extractos else ""
+            main_seccion = " · ".join(all_secciones) if all_secciones else ""
 
             doc_drive_url = get_file_drive_url(
                 filename=doc_name,
-                page=pagina,
+                page=eff_page,
                 fallback_filename=fallback_source,
-                fallback_page=fallback_page,
+                fallback_page=eff_page,
             )
-
-            # Página efectiva para el badge visual
-            eff_page = pagina or fallback_page
-            badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {eff_page}</span>' if eff_page else ""
 
             st.markdown(f"""
             <div class="cite-card" style="margin-bottom:8px">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
-                <span class="cite-num">{num}</span>
+                <span class="cite-num">{card_idx}</span>
                 <div style="flex:1">
                   <div class="cite-source">{doc_name}</div>
-                  <div class="cite-section">{seccion}{badge_page}</div>
+                  <div class="cite-section" style="margin-top:2px">{main_seccion}</div>
+                  <div style="margin-top:4px">{pages_html}</div>
                 </div>
               </div>
-              {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
+              {f'<div class="cite-excerpt">"{main_extracto}..."</div>' if main_extracto else ''}
             </div>
             """, unsafe_allow_html=True)
 
@@ -905,7 +955,7 @@ else:
             with c_act1:
                 if st.button(
                     "🔍 Ver y resaltar en PDF",
-                    key=f"btn_pdf_modal_{num}",
+                    key=f"btn_pdf_modal_{card_idx}",
                     use_container_width=True,
                     type="primary",
                     help="Abre el PDF local oficial directamente en la página con el texto subrayado en amarillo."
@@ -913,8 +963,8 @@ else:
                     show_pdf_viewer_modal(
                         doc_name=doc_name,
                         page_val=eff_page,
-                        extracto=extracto,
-                        seccion=seccion,
+                        extracto=main_extracto,
+                        seccion=main_seccion,
                         fallback_source=fallback_source,
                         drive_url=doc_drive_url,
                     )

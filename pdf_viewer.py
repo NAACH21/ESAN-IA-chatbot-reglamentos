@@ -37,54 +37,93 @@ def _tokenize(text: str):
     words = re.findall(r"[a-z0-9]+", text)
     return {_STEMS_MAP.get(w, w) for w in words if len(_STEMS_MAP.get(w, w)) >= 3}
 
+def _walk_docs_files():
+    """
+    Recorre DOCS/ de forma recursiva (nivel raíz + subdirectorios) y devuelve
+    lista de tuplas (filename_basename, full_path) para solo archivos soportados.
+    """
+    supported = {".pdf", ".docx", ".xlsx"}
+    result = []
+    if not os.path.exists(DOCS_DIR):
+        return result
+    for entry in os.scandir(DOCS_DIR):
+        ext = os.path.splitext(entry.name)[1].lower()
+        if entry.is_file() and ext in supported:
+            result.append((entry.name, entry.path))
+        elif entry.is_dir():
+            for sub in os.scandir(entry.path):
+                sub_ext = os.path.splitext(sub.name)[1].lower()
+                if sub.is_file() and sub_ext in supported:
+                    result.append((sub.name, sub.path))
+    return result
+
+
 def resolve_local_doc_path(doc_name: str, fallback_source: str = "") -> str:
     """
     Resuelve el nombre del documento indicado en la cita a la ruta del archivo físico en DOCS/.
+    Busca recursivamente incluyendo subdirectorios de DOCS/.
     """
-    if not os.path.exists(DOCS_DIR):
-        return ""
-    all_files = os.listdir(DOCS_DIR)
+    all_entries = _walk_docs_files()  # [(basename, full_path), ...]
 
-    # 1. Fallback exacto si existe
-    if fallback_source and fallback_source in all_files:
-        return os.path.join(DOCS_DIR, fallback_source)
+    # 1. Fallback exacto por basename
+    if fallback_source:
+        for bname, fpath in all_entries:
+            if bname == fallback_source:
+                return fpath
 
-    # 2. Nombre exacto o con tildes normalizadas
+    # 2. Nombre exacto (normalizado de tildes)
     clean_query = _strip_accents(os.path.basename(doc_name).strip().lower())
-    for f in all_files:
-        if _strip_accents(f.lower()) == clean_query:
-            return os.path.join(DOCS_DIR, f)
+    for bname, fpath in all_entries:
+        if _strip_accents(bname.lower()) == clean_query:
+            return fpath
 
-    # 3. Subcadena directa
-    for f in all_files:
-        f_clean = _strip_accents(f.lower())
+    # 3. Subcadena directa (query dentro del nombre o viceversa)
+    for bname, fpath in all_entries:
+        f_clean = _strip_accents(bname.lower())
         if clean_query in f_clean or f_clean in clean_query:
-            return os.path.join(DOCS_DIR, f)
+            return fpath
 
     # 4. Fallback subcadena
     if fallback_source:
         fb_clean = _strip_accents(fallback_source.lower())
-        for f in all_files:
-            f_clean = _strip_accents(f.lower())
+        for bname, fpath in all_entries:
+            f_clean = _strip_accents(bname.lower())
             if fb_clean in f_clean or f_clean in fb_clean:
-                return os.path.join(DOCS_DIR, f)
+                return fpath
 
-    # 5. Coincidencia por tokens / raíces
+    # 5. Coincidencia difusa por tokens / raíces
     q_tokens = _tokenize(doc_name)
-    best_file = None
+    best_path = None
     best_score = 0.0
-    for f in all_files:
-        f_tokens = _tokenize(f)
-        if not f_tokens:
+    for bname, fpath in all_entries:
+        f_tokens = _tokenize(bname)
+        if not f_tokens or not q_tokens:
             continue
         overlap = len(q_tokens.intersection(f_tokens))
         score = overlap / (len(q_tokens) + 0.2 * len(f_tokens))
         if score > best_score:
             best_score = score
-            best_file = f
+            best_path = fpath
 
-    if best_file and best_score >= 0.25:
-        return os.path.join(DOCS_DIR, best_file)
+    if best_path and best_score >= 0.25:
+        return best_path
+
+    # 6. Fallback: búsqueda difusa sobre fallback_source
+    if fallback_source:
+        fb_tokens = _tokenize(fallback_source)
+        best_path_fb = None
+        best_score_fb = 0.0
+        for bname, fpath in all_entries:
+            f_tokens = _tokenize(bname)
+            if not f_tokens or not fb_tokens:
+                continue
+            overlap = len(fb_tokens.intersection(f_tokens))
+            score = overlap / (len(fb_tokens) + 0.2 * len(f_tokens))
+            if score > best_score_fb:
+                best_score_fb = score
+                best_path_fb = fpath
+        if best_path_fb and best_score_fb >= 0.25:
+            return best_path_fb
 
     return ""
 

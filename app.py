@@ -1,6 +1,7 @@
 import os
 import sys
 import base64
+from html import escape
 import importlib
 import streamlit as st
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ from ingest import (
     ARCHIVE_FOLDER,
 )
 from rag_engine import RAGEngine, MODELS, GOOGLE_DRIVE_FOLDER
+from pdf_viewer import locate_local_pdf, render_pdf_page
 from drive_sync import (
     sync_from_drive,
     download_full_folder_gdown,
@@ -37,6 +39,47 @@ from drive_sync import (
 )
 
 load_dotenv()
+
+
+@st.cache_data(show_spinner=False, max_entries=24)
+def _cached_pdf_page(pdf_path: str, pdf_mtime_ns: int, page: int, excerpt: str):
+    # pdf_mtime_ns invalida caché si cambia el archivo.
+    return render_pdf_page(pdf_path, page, excerpt=excerpt)
+
+
+@st.dialog("Página citada del reglamento", width="large")
+def show_pdf_dialog(document_name: str, page_number: int, excerpt: str):
+    """Vista de una única página del PDF; no mantiene widgets de navegación."""
+    local_pdf = locate_local_pdf(document_name)
+    if local_pdf is None:
+        st.warning("No se encontró este documento en DOCS. Utiliza el enlace a Google Drive.")
+        return
+
+    try:
+        png, total, marked = _cached_pdf_page(
+            str(local_pdf), local_pdf.stat().st_mtime_ns, page_number, excerpt
+        )
+        st.caption(f"{document_name} · Página {page_number} de {total}")
+        if excerpt:
+            if marked:
+                st.caption("Pasaje citado resaltado en amarillo.")
+            else:
+                st.info("No se pudo localizar literalmente el extracto en esta página. Comprueba el pasaje original.")
+        # La imagen se ajusta al espacio visible del modal, manteniendo la
+        # proporción de la hoja y sin exigir desplazarse por una página ampliada.
+        import base64
+        encoded = base64.b64encode(png).decode("ascii")
+        st.markdown(
+            '<div style="display:flex;justify-content:center;width:100%;">'
+            '<img alt="Página citada del documento normativo" '
+            'style="display:block;max-width:100%;max-height:65vh;object-fit:contain;'
+            'width:auto;height:auto;" '
+            f'src="data:image/png;base64,{encoded}">'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    except (OSError, RuntimeError, ValueError) as exc:
+        st.error(f"No se pudo visualizar esta página: {exc}")
 
 # ── CARGA SILENCIOSA DE CREDENCIALES (Sin mostrar en la interfaz) ───────────────
 api_key = os.getenv("OPENAI_API_KEY", "") or os.getenv("openai_api_key", "")
@@ -100,6 +143,32 @@ st.markdown("""
 
 html, body, [class*="css"] {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* V3.2: desplazamiento suave y centrado visual de citas vinculadas. */
+html,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+    scroll-behavior: smooth;
+}
+
+/* La tarjeta se sitúa aproximadamente en el centro del área visible. */
+.cite-card[id^="cita-"] {
+    scroll-margin-top: calc(50vh - 75px);
+}
+
+/* El destino del enlace se ilumina brevemente y vuelve a su estilo normal. */
+@keyframes espan-cita-destacada {
+    0%   { background-color: rgba(250, 204, 21, 0.25); box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.4); }
+    65%  { background-color: rgba(250, 204, 21, 0.16); box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2); }
+    100% { background-color: transparent; box-shadow: none; }
+}
+.cite-card[id^="cita-"]:target {
+    animation: espan-cita-destacada 1.6s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+    html, [data-testid="stAppViewContainer"], [data-testid="stMain"] { scroll-behavior: auto; }
+    .cite-card[id^="cita-"]:target { animation: none; outline: 2px solid #D4A017; }
 }
 
 /* Navbar Institucional Superior */
@@ -298,6 +367,25 @@ html, body, [class*="css"] {
     background: #E0E7FF;
     text-decoration: none;
 }
+
+/* Botón Ver página: estilo secundario armonizado con el enlace de Drive. */
+.st-key-open_pdf_modal_1 button,
+[class*="st-key-open_pdf_modal_"] button {
+    color: #1967D2 !important;
+    background: #F0F7FF !important;
+    border: 1px solid #DBEAFE !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;
+    min-height: 34px !important;
+    transition: background 0.15s ease !important;
+}
+[class*="st-key-open_pdf_modal_"] button:hover {
+    color: #174EA6 !important;
+    background: #E0E7FF !important;
+    border-color: #BFDBFE !important;
+}
+/* Enlace original de Drive: el estilo drive-link no se modifica. */
 
 /* Razonamiento */
 .reason-box {
@@ -525,16 +613,16 @@ st.markdown(f"""
     <div class="esan-nav-divider"></div>
     <div>
       <div class="esan-nav-title">SISTEMA INSTITUCIONAL DE CONSULTA Y GESTIÓN NORMATIVA</div>
-      <div class="esan-nav-subtitle">Coordinación Académica · Marco Reglamentario Vigente</div>
+      <div class="esan-nav-subtitle">Coordinación Académica · Documentación institucional indexada</div>
     </div>
   </div>
   <div class="esan-nav-right">
     <div class="esan-status-indicator">
       <span class="pulse-dot"></span>
-      <span class="status-text">Repositorio Vigente · 43 Reglamentos</span>
+      <span class="status-text">Repositorio documental · vigencia por confirmar</span>
     </div>
     <div class="status-pill-model">
-      {SVG["shield_check"]} Verificación Oficial
+      {SVG["shield_check"]} Asistencia para revisión normativa
     </div>
   </div>
 </div>
@@ -633,25 +721,54 @@ else:
         if "no procede" in proc_lower:
             badge_bg, badge_border, badge_text = "#FEF2F2", "#FECACA", "#991B1B"
             icon_badge = SVG["alert"]
-        elif "no contemplado" in proc_lower or "elevación" in proc_lower:
+        elif "no contemplado" in proc_lower or "elevación" in proc_lower or "insuficiente" in proc_lower or "revisión" in proc_lower or "validación" in proc_lower:
             badge_bg, badge_border, badge_text = "#FFFBEB", "#FDE68A", "#92400E"
             icon_badge = SVG["alert"]
         else:
             badge_bg, badge_border, badge_text = "#F0FDF4", "#BBF7D0", "#166534"
             icon_badge = SVG["check"]
 
+        # V3.1: las afirmaciones referenciadas sustituyen al resumen libre
+        # dentro del recuadro. Nunca se duplica el criterio en otro apartado.
+        # Los números proceden exclusivamente de citas ya validadas por Python.
+        claims_linked = result.get("afirmaciones_citadas_validadas", [])
+        citas_aceptadas = result.get("citas_normativas", [])
+        partes_criterio = []
+        if not result.get("validacion_pendiente") and isinstance(claims_linked, list):
+            for claim in claims_linked:
+                if not isinstance(claim, dict):
+                    continue
+                texto = str(claim.get("texto", "")).strip()
+                numeros = []
+                for numero in claim.get("numeros", []):
+                    if isinstance(numero, int) and not isinstance(numero, bool) and 1 <= numero <= len(citas_aceptadas) and numero not in numeros:
+                        numeros.append(numero)
+                if texto and numeros:
+                    refs = " ".join(
+                        f'<a href="#cita-{n}" style="color:#1D4ED8;font-weight:700;text-decoration:none">[{n}]</a>'
+                        for n in numeros
+                    )
+                    partes_criterio.append(f"{escape(texto)} {refs}")
+
+        if partes_criterio:
+            criterio_html = " ".join(partes_criterio)
+        else:
+            # Sin relaciones verificadas, se conserva el resumen sin insertar
+            # referencias arbitrarias. La interfaz conserva su estado de revisión.
+            criterio_html = escape(resumen_ejecutivo)
+
         st.markdown(f"""
         <div style="background:{badge_bg};border:1.5px solid {badge_border};border-radius:8px;padding:12px 16px;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span style="font-weight:800;font-size:0.88rem;color:{badge_text};text-transform:uppercase;letter-spacing:0.02em">
-              {icon_badge} {procedencia}
+              {icon_badge} {escape(procedencia)}
             </span>
           </div>
           <div style="font-size:0.86rem;color:#1E293B;line-height:1.5;margin-bottom:8px">
-            <b>Criterio resolutivo:</b> {resumen_ejecutivo}
+            <b>Criterio resolutivo:</b> {criterio_html}
           </div>
           <div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px">
-            {SVG['shield_check']} <span><b>Instancia competente:</b> {appr}</span>
+            {SVG['shield_check']} <span><b>Instancia competente:</b> {escape(appr)}</span>
           </div>
         </div>
         """, unsafe_allow_html=True)
@@ -667,7 +784,7 @@ else:
         reason = result.get("razonamiento", "")
         if reason:
             with st.expander("Ver fundamentación y razonamiento normativo"):
-                st.markdown(f'<div class="reason-box">{reason}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="reason-box">{escape(reason)}</div>', unsafe_allow_html=True)
 
         st.markdown("<hr style='margin:16px 0'>", unsafe_allow_html=True)
 
@@ -686,69 +803,109 @@ else:
             else:
                 draft = result.get("dictamen_coordinacion", {}).get("resumen_ejecutivo", "") or result.get("razonamiento", "")
 
-        st.markdown(f'<div class="draft-box">{draft}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="draft-box">{escape(draft)}</div>', unsafe_allow_html=True)
 
         # Botones de Copia Rápidos
         b_c1, b_c2 = st.columns(2)
+        copia_bloqueada = bool(result.get("validacion_pendiente"))
+        if copia_bloqueada:
+            st.warning("El borrador requiere validación del ámbito o de su sustento antes de compartirse.")
         wa_text = f"*Coordinación Académica ESAN*\n\n{draft}"
-        mail_text = f"Estimado/a estudiante,\n\n{draft}"
+        # El borrador ya incluye saludo; no repetirlo en el correo copiado.
+        mail_text = draft
 
         with b_c1:
-            if st.button("Copiar formato WhatsApp", key="btn_cp_wa", use_container_width=True):
+            if st.button("Copiar formato WhatsApp", key="btn_cp_wa", use_container_width=True, disabled=copia_bloqueada):
                 st.code(wa_text, language=None)
                 st.toast("Texto preparado para WhatsApp — cópialo del recuadro")
         with b_c2:
-            if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True):
+            if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True, disabled=copia_bloqueada):
                 st.code(mail_text, language=None)
                 st.toast("Texto preparado para Correo — cópialo del recuadro")
 
     # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
     with col_norm:
-        st.markdown(f'<div class="esan-card-title">{SVG["book"]} Respaldo Normativo y Citas ({len(sources)} fuentes)</div>', unsafe_allow_html=True)
-
         citas = result.get("citas_normativas", [])
-        displayed = {}
-        for c in citas:
-            num = c.get("numero", 0)
-            displayed[num] = c
+        documentos = len({c.get("documento", "") for c in citas})
+        st.markdown(
+            f'<div class="esan-card-title">{SVG["book"]} Citas verificadas: '
+            f'{len(citas)} · Documentos: {documentos}</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            f"Se recuperaron {len(sources)} fragmentos para el análisis. "
+            "Solo se muestran extractos que coinciden literalmente con un fragmento recuperado; "
+            "esto no certifica vigencia ni aplicabilidad jurídica."
+        )
+        auditoria = result.get("auditoria_citas", {})
+        if auditoria.get("duplicadas") or auditoria.get("no_verificables"):
+            st.caption(
+                f"Control automático: {auditoria.get('duplicadas', 0)} citas duplicadas "
+                f"y {auditoria.get('no_verificables', 0)} citas sin coincidencia literal descartadas."
+            )
+        if not citas:
+            st.warning(
+                "No hay citas textuales verificadas para respaldar este dictamen. "
+                "La búsqueda recuperó material contextual, pero no constituye por sí sola "
+                "prueba normativa. No emitir la comunicación sin revisión institucional."
+            )
+        elif result.get("validacion_pendiente"):
+            st.warning(
+                "Hay citas literales, pero todavía falta confirmar el programa y "
+                "la aplicabilidad normativa. No emitir una respuesta definitiva hasta verificarlo."
+            )
 
-        if not displayed:
-            for i_s, s in enumerate(sources[:6], 1):
-                displayed[i_s] = {
-                    "numero": i_s,
-                    "documento": s["source"],
-                    "seccion": s["section"],
-                    "pagina": str(s["page"]),
-                    "extracto": s["text"][:220],
-                }
-
-        for num, c in sorted(displayed.items()):
-            doc_name = c.get("documento", "")
-            seccion = c.get("seccion", "")
-            pagina = c.get("pagina", "")
-            extracto = c.get("extracto", "")
-
-            doc_drive_url = get_file_drive_url(doc_name, pagina)
+        for num, c in enumerate(citas, 1):
+            # Nunca insertar valores del modelo directamente como HTML.
+            doc_name = str(c.get("documento", ""))
+            seccion = escape(str(c.get("seccion", "")))
+            pagina = escape(str(c.get("pagina", "")))
+            extracto = escape(str(c.get("extracto", "")))
+            safe_doc_name = escape(doc_name)
+            doc_drive_url = escape(get_file_drive_url(doc_name, c.get("pagina", "")), quote=True)
             badge_page = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:6px;font-size:0.73rem;font-weight:700;border:1px solid #FECACA;margin-left:6px">Pág. {pagina}</span>' if pagina else ""
 
             st.markdown(f"""
-            <div class="cite-card">
+            <div class="cite-card" id="cita-{num}">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
                 <span class="cite-num">{num}</span>
                 <div style="flex:1">
-                  <div class="cite-source">{doc_name}</div>
+                  <div class="cite-source">{safe_doc_name}</div>
                   <div class="cite-section">{seccion}{badge_page}</div>
                 </div>
               </div>
-              {f'<div class="cite-excerpt">"{extracto}..."</div>' if extracto else ''}
-              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
-                <a href="{doc_drive_url}" target="_blank" class="drive-link">
-                  {SVG["drive"]} Abrir archivo en Google Drive
-                </a>
-                {f'<span style="font-size:0.74rem;color:#64748B;display:inline-flex;align-items:center;gap:4px">{SVG["pin"]} Ubicación: <b>Pág. {pagina}</b></span>' if pagina else ''}
-              </div>
+              {f'<div class="cite-excerpt">“{extracto}”</div>' if extracto else ''}
             </div>
             """, unsafe_allow_html=True)
+
+            # Acciones lado a lado: documento original y vista de la página citada.
+            try:
+                physical_page = int(c.get("pagina"))
+                valid_page = physical_page >= 1
+            except (ValueError, TypeError):
+                valid_page = False
+                physical_page = None
+
+            col_drive, col_preview = st.columns(2, gap="small")
+            with col_drive:
+                # Conserva el enlace y estilo institucional original de Drive.
+                st.markdown(
+                    f'<div style="padding-top:3px;">'
+                    f'<a href="{doc_drive_url}" target="_blank" '
+                    f'rel="noopener noreferrer" class="drive-link">'
+                    f'{SVG["drive"]} Abrir archivo en Google Drive</a></div>',
+                    unsafe_allow_html=True,
+                )
+            with col_preview:
+                if valid_page and doc_name.lower().endswith(".pdf"):
+                    if st.button(
+                        f"Ver página {physical_page}",
+                        key=f"open_pdf_modal_{num}",
+                        use_container_width=True,
+                    ):
+                        show_pdf_dialog(doc_name, physical_page, str(c.get("extracto", "")))
+                else:
+                    st.caption("Vista local no disponible")
 
 # ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
 st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
@@ -804,7 +961,8 @@ if run_query and api_key and student_msg.strip():
                 query=student_msg.strip(),
                 context_extra=extra_ctx.strip() if 'extra_ctx' in locals() and extra_ctx else "",
                 model_label=model_label,
-                chat_history=st.session_state.history,
+                # Consultas de otros alumnos no deben contaminar este dictamen.
+                chat_history=None,
             )
             st.session_state.last_result = result_data
             st.session_state.last_sources = sources_data

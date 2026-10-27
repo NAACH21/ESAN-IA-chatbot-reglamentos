@@ -1,0 +1,104 @@
+/* ESAN · Fase 6 — jerarquía editorial, interacción y evidencias diferenciadas.
+   Aditivo sobre v5; compatible con un ancho de ventana variable. */
+:root {
+  --esan6-red:#c8102e;
+  --esan6-red-dark:#a70b23;
+  --esan6-red-soft:#fff0f2;
+  --esan6-ink:#14263f;
+  --esan6-line:#dfe5ee;
+  --esan6-bg:#f4f6fa;
+}
+[data-testid="stMain"] {background:var(--esan6-bg)!important;}
+[data-testid="stMainBlockContainer"] {padding-top:1rem!important;}
+.esan-navbar {border-top:3px solid var(--esan6-red)!important; border-left:0!important;}
+.esan4-panel-eyebrow {color:var(--esan6-red-dark)!important;font-weight:800!important;letter-spacing:.095em!important;font-size:.72rem!important;margin-bottom:.55rem!important;}
+.esan4-panel-eyebrow::before {content:"";display:inline-block;width:14px;height:2px;background:var(--esan6-red);margin-right:9px;vertical-align:middle;}
+/* Espaciado global más uniforme y moderado: evita triples separaciones por markdown + widgets. */
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) {
+  background:#fff!important;
+  border:1px solid var(--esan6-line)!important;
+  border-top:4px solid var(--esan6-red)!important;
+  padding:1.05rem!important;
+  border-radius:14px!important;
+  box-shadow:0 8px 26px rgba(26,46,73,.065)!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) .esan3-form-head h2,
+[data-testid="stColumn"]:has(.esan4-panel-right) .esan3-results-intro h2 {
+  color:var(--esan6-ink)!important;line-height:1.3!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) .esan3-form-head,
+[data-testid="stColumn"]:has(.esan4-panel-right) .esan3-results-intro {margin-bottom:.65rem!important;}
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stMarkdownContainer"] > p:empty {display:none!important;}
+[data-testid="stColumn"]:has(.esan4-panel-right) [data-testid="stTabs"] [data-baseweb="tab-list"] {border-bottom:2px solid #edd0d5!important;}
+[data-testid="stColumn"]:has(.esan4-panel-right) [data-testid="stTabs"] [data-baseweb="tab"][aria-selected="true"] {
+  color:var(--esan6-red-dark)!important;
+  box-shadow:inset 0 -3px 0 var(--esan6-red), 0 2px 8px rgba(28,42,63,.07)!important;
+}
+/* Programa como control segmentado continuo: seleccionado rojo institucional. */
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] {
+  width:100%!important;
+  margin-bottom:.3rem!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] [role="radiogroup"],
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] > div {
+  max-width:100%!important;flex-wrap:wrap!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] button,
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] label {
+  min-height:40px!important;
+  padding:.46rem .7rem!important;
+  border-radius:5px!important;
+  border:1px solid #dce3ed!important;
+  background:#fff!important;
+  color:var(--esan6-ink)!important;
+  font-weight:700!important;
+  font-size:.85rem!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] button[aria-pressed="true"],
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] label[data-checked="true"],
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] label:has(input:checked),
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] [aria-checked="true"],
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] button[data-selected="true"] {
+  background:var(--esan6-red)!important;border-color:var(--esan6-red)!important;color:#fff!important;
+  box-shadow:0 2px 8px rgba(200,16,46,.15)!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] button:focus-visible,
+[data-testid="stColumn"]:has(.esan4-panel-left) [data-testid="stSegmentedControl"] label:focus-within {
+  outline:2px solid #1d5b99!important;outline-offset:2px!important;
+}
+/* Reglas generales para texto: títulos no compiten y las acciones no parecen avisos críticos. */
+[data-testid="stColumn"]:has(.esan4-panel-right) .esan-card-title {margin:.2rem 0 .65rem!important;}
+[data-testid="stColumn"]:has(.esan4-panel-right) .reason-box,
+[data-testid="stColumn"]:has(.esan4-panel-right) .draft-box {padding:1.1rem 1.2rem!important;}
+[data-testid="stColumn"]:has(.esan4-panel-right) .cite-card {
+  border:1px solid var(--esan6-line)!important; border-left:4px solid #afbccd!important;
+  background:#fff!important;border-radius:11px!important;padding:1rem!important;
+}
+[data-testid="stColumn"]:has(.esan4-panel-right) .cite-card.esan6-verified-card {border-left-color:var(--esan6-red)!important;}
+[data-testid="stColumn"]:has(.esan4-panel-right) .cite-card.esan6-related-card {border-left-color:#b7c1cd!important;}
+/* Parte de evidencia: dos datos visibles, aviso de estado y tarjetas de contexto. */
+.esan6-evidence-header {margin:0 0 .8rem;}
+.esan6-evidence-header h3 {font-size:1rem;line-height:1.3;color:var(--esan6-ink);margin:.35rem 0 .9rem;font-weight:800;}
+.esan6-eyebrow {font-size:.67rem;letter-spacing:.13em;color:#b41933;font-weight:850;}
+.esan6-evidence-metrics {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.25rem 0 .7rem;}
+.esan6-metric {background:#f5f7fa;border:1px solid #e8edf3;border-radius:10px;padding:.78rem 1rem;display:flex;flex-direction:column;gap:4px;}
+.esan6-metric strong {font-size:1.45rem;line-height:1.1;color:#1c314d;font-weight:850;}
+.esan6-metric span {font-size:.76rem;line-height:1.35;color:#5a6e84;}
+.esan6-related-intro,.esan6-verified-intro {margin:.65rem 0 .85rem;border-radius:10px;padding:.88rem 1rem;font-size:.84rem;line-height:1.55;}
+.esan6-related-intro {background:#f4f6f9;border:1px solid #dce3ec;display:flex;gap:.7rem;align-items:flex-start;color:#41536c;}
+.esan6-related-intro strong {display:block;color:#263a55;margin-bottom:.25rem;font-size:.86rem;}
+.esan6-related-intro p {margin:0;color:#627086;font-size:.81rem;}
+.esan6-related-dot {width:8px;height:8px;background:#adbacb;flex:none;margin-top:.45rem;border-radius:50%;}
+.esan6-verified-intro {background:#fdf4f5;border:1px solid #f3d5db;color:#783a46;}
+/* Reforzar marca sin pintar toda la página de rojo. */
+.esan6-loading {display:flex;align-items:flex-start;gap:1.25rem;padding:1.65rem;
+  border-radius:15px;background:linear-gradient(115deg,#192e49,#17283d);color:#fff;
+  border-left:5px solid var(--esan6-red);box-shadow:0 12px 35px rgba(25,41,66,.14);min-height:142px;}
+.esan6-loading .esan6-eyebrow{color:#ff9daa;}
+.esan6-loading h2 {font-size:1.25rem;line-height:1.25;color:#fff!important;margin:.4rem 0 .45rem;font-weight:800;}
+.esan6-loading p {font-size:.85rem;color:#d0dae7;line-height:1.6;margin:0;max-width:600px;}
+.esan6-loading-spinner {display:block;width:32px;height:32px;border:3px solid #54677e;border-top-color:#fa3655;
+  border-radius:50%;flex:none;margin-top:.32rem;animation:esan6spin .85s linear infinite;}
+@keyframes esan6spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.esan6-loading-spinner{animation:none}}
+@media(max-width:850px){.esan6-evidence-metrics{gap:8px}.esan6-metric{padding:.65rem}.esan6-loading{padding:1rem;gap:.8rem}}

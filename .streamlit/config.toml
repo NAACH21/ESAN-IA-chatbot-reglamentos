@@ -1,0 +1,7 @@
+# Tema institucional ESAN: configuración visual, no de lógica.
+[theme]
+primaryColor = "#CF1229"
+backgroundColor = "#F5F7FB"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#17253C"
+font = "sans serif"

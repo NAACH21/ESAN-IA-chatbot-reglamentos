@@ -1,0 +1,319 @@
+/* ESAN-F3-COMPOSITION — nueva composición (no solo colores).
+   Capa adicional sobre redisenio.css (fases 1/2).
+   Mantener intactos botones nativos, IDs, eventos, control de acceso y evidencia. */
+
+:root {
+  --esan3-red: #c91832;
+  --esan3-red-d: #a51429;
+  --esan3-ink: #14243a;
+  --esan3-mid: #485a70;
+  --esan3-muted: #78879a;
+  --esan3-line: #e4e9f0;
+  --esan3-bg: #f4f6fa;
+  --esan3-white: #ffffff;
+}
+
+[data-testid="stAppViewContainer"], [data-testid="stMain"] {
+  background: var(--esan3-bg) !important;
+}
+[data-testid="stMainBlockContainer"], .main .block-container {
+  max-width: 1540px !important;
+  padding: 1.5rem 2rem 3.5rem !important;
+}
+[data-testid="stMain"] .esan-navbar {
+  border-top: none !important;
+  border-left: 4px solid var(--esan3-red) !important;
+  padding: 17px 22px !important;
+  margin-bottom: 24px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(25,44,77,.055) !important;
+}
+.esan-nav-logo { height: 47px !important; }
+.esan-nav-title { letter-spacing: -.008em; }
+[data-testid="stSidebar"] {
+  box-shadow: 6px 0 24px rgba(29,45,75,.025);
+}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] { padding: 1.7rem 1.25rem 2rem; }
+
+/* CABECERA DE LA CONSULTA: composición dividida, no otro título plano. */
+.esan3-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 26px;
+  align-items: stretch;
+  margin: 4px 0 25px;
+}
+.esan3-hero-main {
+  padding: 20px 4px 12px;
+  min-width: 0;
+}
+.esan3-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+  color: #b71932;
+  margin: 0 0 14px;
+}
+.esan3-mark { width: 22px; height: 2px; background: var(--esan3-red); display: inline-block; }
+.esan3-hero h1 {
+  color: var(--esan3-ink);
+  font-size: clamp(1.65rem, 2.5vw, 2.35rem);
+  font-weight: 790;
+  letter-spacing: -.045em;
+  line-height: 1.17;
+  margin: 0 0 12px;
+  max-width: 780px;
+}
+.esan3-hero p {
+  color: #65758a;
+  max-width: 720px;
+  line-height: 1.65;
+  font-size: .87rem;
+  margin: 0;
+}
+.esan3-hero-aside {
+  background: linear-gradient(125deg,#182b42 0%,#243c57 100%);
+  padding: 21px 22px;
+  min-height: 174px;
+  border-radius: 17px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  box-shadow: 0 12px 30px rgba(23,44,73,.13);
+}
+.esan3-hero-aside-symbol {
+  width: 28px;
+  height: 28px;
+  margin: 0 0 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.45);
+  position: relative;
+}
+.esan3-hero-aside-symbol::after {
+  content: '';
+  width: 9px;
+  height: 9px;
+  display: block;
+  background: #ef9ca7;
+  border-radius: 50%;
+  position: absolute;
+  left: 9px;
+  top: 9px;
+}
+.esan3-hero-aside span {
+  color: #b8c6d5;
+  font-size: .59rem;
+  font-weight: 750;
+  letter-spacing: .14em;
+}
+.esan3-hero-aside strong {
+  color: #fff;
+  font-size: 1rem;
+  margin: 5px 0 7px;
+  font-weight: 680;
+}
+.esan3-hero-aside small { color: #c5d1dd; font-size: .71rem; line-height: 1.5; }
+
+/* SECCIONES CON NUMERACIÓN DE PROCESO */
+.esan3-section-intro,
+.esan3-section-intro > div {
+  display: flex;
+  align-items: center;
+}
+.esan3-section-intro { justify-content: space-between; gap: 18px; margin: 3px 0 17px; }
+.esan3-section-intro > div { gap: 12px; }
+.esan3-number {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  background: #ffebee;
+  border: 1px solid #f7d9df;
+  color: #b3172e;
+  font-size: .79rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+.esan3-section-intro h2 { color: var(--esan3-ink); font-weight: 770; font-size: 1.04rem; margin: 0 0 3px; }
+.esan3-section-intro p { color: #7e8c9d; font-size: .74rem; margin: 0; }
+.esan3-section-meta { font-size: .73rem; color: #8c9aab; }
+
+/* TARJETAS REALES. El botón de Streamlit forma parte del MISMO contenedor. */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) {
+  border: 1px solid #e1e7ee !important;
+  background: #fff !important;
+  border-radius: 17px !important;
+  padding: 0 !important;
+  box-shadow: 0 7px 23px rgba(20,38,62,.045) !important;
+  overflow: hidden;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head):hover {
+  border-color: #d9a8b1 !important;
+  box-shadow: 0 14px 30px rgba(20,38,62,.085) !important;
+  transform: translateY(-2px);
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stElementContainer"]:has(.esan3-card-head) {
+  margin-bottom: 0 !important;
+}
+.esan3-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  min-height: 148px;
+  padding: 24px 22px 16px;
+}
+.esan3-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  border: 1px solid #f1d5da;
+  background: #fff1f3;
+  border-radius: 13px;
+}
+.esan3-icon svg { width: 20px !important; height: 20px !important; margin-right: 0 !important; stroke: #c91832 !important; }
+.esan3-icon-blue { border-color: #d9e4f1; background: #eff4fb; }
+.esan3-icon-blue svg { stroke: #425c83 !important; }
+.esan3-icon-gold { border-color: #f4e8d2; background: #fff9ef; }
+.esan3-icon-gold svg { stroke: #a07635 !important; }
+.esan3-card-content { min-width: 0; flex: 1; }
+.esan3-card-category { color: #9aa5b3; font-size: .60rem; letter-spacing: .12em; font-weight: 800; }
+.esan3-card-content h3 { color: #17263c; font-size: 1.00rem; font-weight: 770; letter-spacing: -.015em; margin: 7px 0 8px; line-height: 1.35; }
+.esan3-card-content p { color: #738399; font-size: .77rem; line-height: 1.58; margin: 0; }
+.esan3-card-index { color: #c3ccd6; font-size: .76rem; font-weight: 760; margin-left: auto; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stButton"] {
+  margin: 0 22px 19px !important;
+  border-top: 1px solid #f0f2f5;
+  padding-top: 13px;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stButton"] button {
+  width: 100% !important;
+  min-height: 42px !important;
+  color: #b61b33 !important;
+  background: #fff6f7 !important;
+  border: 1px solid #f2d9dd !important;
+  border-radius: 9px !important;
+  font-weight: 730 !important;
+  font-size: .76rem !important;
+  text-align: center;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stButton"] button:hover {
+  background: #c91832 !important;
+  color: white !important;
+  border-color: #c91832 !important;
+}
+
+/* FORMULARIO ÚNICO: antes todo flotaba libre; ahora queda agrupado. */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) {
+  margin-top: 28px;
+  padding: 25px 30px 30px !important;
+  border: 1px solid #e0e6ee !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 9px 32px rgba(26,43,73,.055);
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) [data-testid="stVerticalBlock"] { gap: .6rem; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) [data-testid="stTextArea"] textarea {
+  min-height: 134px !important;
+  background: #f9fbfe !important;
+  border: 1px solid #d9e1ec !important;
+  font-size: .86rem !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) [data-testid="stRadio"] [role="radiogroup"] > label {
+  background: #f8fafd;
+  border: 1px solid #e2e7ef;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {
+  background: #fff3f5;
+  border-color: #d88996;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) button[kind="primary"] {
+  min-height: 48px !important;
+  border-radius: 10px !important;
+  background: var(--esan3-red) !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) [data-testid="stExpander"] { background: #fbfcfe !important; }
+.esan3-form-marker { display: none; }
+
+/* RESULTADOS: dos paneles claramente separados y grandes. */
+.esan3-results-intro {
+  padding: 14px 0 21px;
+  border-bottom: 1px solid #e4e9f0;
+  margin-bottom: 21px;
+}
+.esan3-results-kicker { font-size: .65rem; letter-spacing: .15em; font-weight: 800; color: var(--esan3-red); }
+.esan3-results-intro h2 { color: var(--esan3-ink); margin: 9px 0 7px; font-size: 1.45rem; font-weight: 780; letter-spacing: -.03em; }
+.esan3-results-intro p { color: #7a8798; font-size: .81rem; margin: 0; line-height: 1.55; }
+[data-testid="stColumn"]:has(.esan3-colmark) {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(22,39,65,.045);
+  padding: 21px 24px 27px;
+}
+.esan3-colmark { display: none; }
+[data-testid="stColumn"]:has(.esan3-colmark) .esan-card-title { font-size: 1rem; margin: 0 0 16px; }
+[data-testid="stColumn"]:has(.esan3-colmark) .cite-card { box-shadow: none !important; }
+[data-testid="stColumn"]:has(.esan3-colmark) .draft-box { background: #fafbfc !important; }
+[data-testid="stColumn"]:has(.esan3-colmark) [data-testid="stCheckbox"] { padding: 3px 0; }
+[data-testid="stColumn"]:has(.esan3-colmark) [data-testid="stExpander"] { margin-top: 15px; }
+
+@media (max-width: 1150px) {
+  .esan3-hero { grid-template-columns: minmax(0,1fr) 250px; }
+  .esan3-hero-aside { padding: 18px; }
+  .esan3-card-head { padding: 19px 17px 15px; min-height: 158px; }
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) [data-testid="stButton"] { margin: 0 17px 17px !important; }
+}
+@media (max-width: 820px) {
+  .esan3-hero { grid-template-columns: 1fr; gap: 12px; }
+  .esan3-hero-aside { min-height: auto; }
+  [data-testid="stMainBlockContainer"] { padding: 1rem !important; }
+  .esan3-hero h1 { font-size: 1.65rem; }
+  .esan3-section-meta { display: none; }
+  .esan3-card-head { min-height: auto; }
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-form-marker) { padding: 18px !important; }
+  [data-testid="stColumn"]:has(.esan3-colmark) { padding: 18px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.esan3-card-head) { transition: none !important; transform: none !important; }
+}
+
+/* Encabezado editorial del formulario: etapa 02 y señal de validación. */
+.esan3-form-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 0 0 20px;
+  padding: 0 0 17px;
+  border-bottom: 1px solid #e9edf3;
+}
+.esan3-form-head-text { flex: 1; min-width: 0; }
+.esan3-form-head-text > span { color: #9c6c77; letter-spacing: .12em; font-weight: 800; font-size: .61rem; }
+.esan3-form-head h2 { font-size: 1.12rem; color: #17263c; letter-spacing: -.025em; margin: 4px 0 5px; font-weight: 770; }
+.esan3-form-head p { color: #7a899c; font-size: .76rem; margin: 0; }
+.esan3-form-head-note {
+  font-size: .61rem;
+  font-weight: 800;
+  color: #8a6d74;
+  letter-spacing: .06em;
+  padding: 8px 11px;
+  border: 1px solid #f0e2e6;
+  background: #fdf8f9;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+@media (max-width: 820px) { .esan3-form-head { align-items: flex-start; } .esan3-form-head-note { display:none; } }

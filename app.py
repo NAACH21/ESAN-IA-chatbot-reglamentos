@@ -476,6 +476,32 @@ button[kind="primary"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
+# ── REDISEÑO INTERFAZ: CAPA DE ESTILOS OPCIONAL ─────────────────────────────
+from pathlib import Path as _esan_Path
+_esan_css_path = _esan_Path(__file__).resolve().parent / "styles" / "redisenio.css"
+if _esan_css_path.is_file():
+    st.markdown("<style>" + _esan_css_path.read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+
+# ── ESAN F3: SISTEMA VISUAL ESTRUCTURAL ─────────────────────────────────────
+_esan_v3_css_path = _esan_Path(__file__).resolve().parent / "styles" / "esan_v3.css"
+if _esan_v3_css_path.is_file():
+    st.markdown("<style>" + _esan_v3_css_path.read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+
+# ESAN-F4-STYLE-LOADER
+_esan_v4_path = _esan_Path(__file__).resolve().parent / "styles" / "esan_v4.css"
+if _esan_v4_path.is_file():
+    st.markdown("<style>" + _esan_v4_path.read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+
+# ESAN-F5-STYLE-LOADER
+_esan_v5_path = _esan_Path(__file__).resolve().parent / "styles" / "esan_v5.css"
+if _esan_v5_path.is_file():
+    st.markdown("<style>" + _esan_v5_path.read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+
+# ESAN-F6-STYLE-LOADER
+_esan_v6_path = _esan_Path(__file__).resolve().parent / "styles" / "esan_v6.css"
+if _esan_v6_path.is_file():
+    st.markdown("<style>" + _esan_v6_path.read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 for key, default in [
     ("history", []),
@@ -728,509 +754,576 @@ st.markdown(f"""
 result = st.session_state.last_result
 sources = st.session_state.last_sources
 
-if result is None:
-    # Pantalla Institucional de Casos Frecuentes
-    st.markdown("""
-    <div class="hero-box">
-      <div class="hero-title">Consultas Reglamentarias y Casuística Estudiantil</div>
-      <div class="hero-desc">
-        Seleccione un tipo de consulta frecuente o ingrese la solicitud del estudiante en el panel inferior para obtener la fundamentación reglamentaria, instancia resolutiva y propuesta de respuesta.
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    c_c1, c_c2 = st.columns(2)
-    with c_c1:
-        st.markdown(f"""
-        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin-bottom:10px">
-          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
-            {SVG['scale']} Reconsideración de Evaluaciones
-          </div>
-          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
-            Plazos reglamentarios, requisitos formales e instancia resolutiva ante reclamos de calificación.
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Consultar plazos y trámite de reconsideración →", key="q_recons", use_container_width=True):
-            st.session_state.quick_q = "¿Cuándo puedo pedir reconsideración de nota y ante qué autoridad corresponde presentarla?"
-            st.session_state.form_id += 1
-            st.rerun()
-
-        st.markdown(f"""
-        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin:14px 0 10px 0">
-          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
-            {SVG['chip']} Lineamientos de Inteligencia Artificial
-          </div>
-          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
-            Disposiciones institucionales para docentes y alumnos sobre el uso de herramientas IA en evaluaciones.
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Consultar directiva sobre uso de IA →", key="q_ia", use_container_width=True):
-            st.session_state.quick_q = "¿Cuáles son los lineamientos sobre el uso de Inteligencia Artificial para docentes y alumnos en ESAN?"
-            st.session_state.form_id += 1
-            st.rerun()
-
-    with c_c2:
-        st.markdown(f"""
-        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin-bottom:10px">
-          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
-            {SVG['grad_cap']} Requisitos para Grado de Bachiller
-          </div>
-          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
-            Cómputo de créditos académicos, acreditación obligatoria de idiomas y condiciones de graduación.
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Consultar requisitos de bachillerato →", key="q_bach", use_container_width=True):
-            st.session_state.quick_q = "¿Cuáles son los requisitos y créditos necesarios para obtener el Grado de Bachiller?"
-            st.session_state.form_id += 1
-            st.rerun()
-
-        st.markdown(f"""
-        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:14px;margin:14px 0 10px 0">
-          <div style="font-weight:700;font-size:0.92rem;color:#0F172A;display:flex;align-items:center;gap:6px">
-            {SVG['book']} Procedimiento de Devolución y Retiro
-          </div>
-          <div style="font-size:0.8rem;color:#64748B;margin:4px 0 10px 0">
-            Plazos de desistimiento, cronograma de retenciones y trámite formal de retiro de programa.
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-        if st.button("Consultar política de devoluciones y retiros →", key="q_ret", use_container_width=True):
-            st.session_state.quick_q = "¿Cuál es el procedimiento formal y plazos para solicitar devolución de dinero o retiro de programa?"
-            st.session_state.form_id += 1
-            st.rerun()
-
-else:
-    # ── PANEL DE CONSULTA EVALUADA (CONSULTA DEL ESTUDIANTE + PROGRAMA) ────────
-    last_q = st.session_state.get("last_query", "")
-    last_prog = st.session_state.get("last_program", "")
-    last_extra = st.session_state.get("last_extra_ctx", "")
-
-    if last_q:
-        badge_prog_html = (
-            f'<span style="background:#FEF2F2;border:1.5px solid #FECACA;color:#991B1B;'
-            f'padding:3px 12px;border-radius:6px;font-size:0.8rem;font-weight:800;letter-spacing:0.03em;'
-            f'display:inline-flex;align-items:center;gap:6px">'
-            f'{SVG["grad_cap"]} Programa: {last_prog}</span>'
-        ) if last_prog else ''
-
-        extra_html = (
-            f'<div style="font-size:0.8rem;color:#475569;margin-top:8px;padding-top:8px;'
-            f'border-top:1px dashed #CBD5E1;display:flex;align-items:center;gap:6px">'
-            f'<span style="font-weight:700;color:#0F172A">Contexto del caso ingresado:</span> {last_extra}</div>'
-        ) if last_extra else ''
-
-        st.markdown(f"""
-        <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #D31418;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-            <div style="font-size:0.75rem;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:6px">
-              {SVG["search"]} Consulta del Estudiante Evaluada
-            </div>
-            {badge_prog_html}
-          </div>
-          <div style="font-size:0.95rem;color:#0F172A;font-weight:600;line-height:1.45">
-            "{last_q}"
-          </div>
-          {extra_html}
-        </div>
-        """, unsafe_allow_html=True)
-
-    # ── VISTA DE RESULTADOS (2 COLUMNAS: RESPUESTA + RESPALDO NORMATIVO) ───────
-    col_resp, col_norm = st.columns([1.35, 1.15], gap="large")
-
-    # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
-    with col_resp:
-        _prog_sel = st.session_state.get('last_program', '') or st.session_state.get('programa_sel', '')
-        _prog_badge = (
-            f'<span style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;'
-            f'border-radius:6px;padding:2px 10px;font-size:0.75rem;font-weight:700;margin-left:8px"'
-            f'>{_prog_sel}</span>'
-        ) if _prog_sel else ''
-        st.markdown(
-            f'<div class="esan-card-title">{SVG["scale"]} Dictamen Técnico y Validación para Coordinación{_prog_badge}</div>',
-            unsafe_allow_html=True
-        )
-
-        # 1. DICTAMEN EJECUTIVO Y PROCEDENCIA (RESPUESTA PRINCIPAL PARA LA COORDINADORA)
-        dictamen = result.get("dictamen_coordinacion", {})
-        procedencia = dictamen.get("procedencia", "Evaluación de Coordinación Académica")
-        resumen_ejecutivo = dictamen.get("resumen_ejecutivo", "") or result.get("razonamiento", "")
-        appr = result.get("requiere_aprobacion", "La coordinadora puede resolver directamente")
-
-        # Estilo de badge según procedencia
-        proc_lower = procedencia.lower()
-        if "no procede" in proc_lower:
-            badge_bg, badge_border, badge_text = "#FEF2F2", "#FECACA", "#991B1B"
-            icon_badge = SVG["alert"]
-        elif "no contemplado" in proc_lower or "elevación" in proc_lower or "insuficiente" in proc_lower or "revisión" in proc_lower or "validación" in proc_lower:
-            badge_bg, badge_border, badge_text = "#FFFBEB", "#FDE68A", "#92400E"
-            icon_badge = SVG["alert"]
-        else:
-            badge_bg, badge_border, badge_text = "#F0FDF4", "#BBF7D0", "#166534"
-            icon_badge = SVG["check"]
-
-        # V3.1: las afirmaciones referenciadas sustituyen al resumen libre
-        # dentro del recuadro. Nunca se duplica el criterio en otro apartado.
-        # Los números proceden exclusivamente de citas ya validadas por Python.
-        claims_linked = result.get("afirmaciones_citadas_validadas", [])
-        citas_aceptadas = result.get("citas_normativas", [])
-        partes_criterio = []
-        if not result.get("validacion_pendiente") and isinstance(claims_linked, list):
-            for claim in claims_linked:
-                if not isinstance(claim, dict):
-                    continue
-                texto = str(claim.get("texto", "")).strip()
-                numeros = []
-                for numero in claim.get("numeros", []):
-                    if isinstance(numero, int) and not isinstance(numero, bool) and 1 <= numero <= len(citas_aceptadas) and numero not in numeros:
-                        numeros.append(numero)
-                if texto and numeros:
-                    refs = " ".join(
-                        f'<a href="#cita-{n}" style="color:#1D4ED8;font-weight:700;text-decoration:none">[{n}]</a>'
-                        for n in numeros
-                    )
-                    partes_criterio.append(f"{escape(texto)} {refs}")
-
-        if partes_criterio:
-            criterio_html = " ".join(partes_criterio)
-        else:
-            # Sin relaciones verificadas, se conserva el resumen sin insertar
-            # referencias arbitrarias. La interfaz conserva su estado de revisión.
-            criterio_html = escape(resumen_ejecutivo)
-
-        st.markdown(f"""
-        <div style="background:{badge_bg};border:1.5px solid {badge_border};border-radius:8px;padding:12px 16px;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="font-weight:800;font-size:0.88rem;color:{badge_text};text-transform:uppercase;letter-spacing:0.02em">
-              {icon_badge} {escape(procedencia)}
-            </span>
-          </div>
-          <div style="font-size:0.86rem;color:#1E293B;line-height:1.5;margin-bottom:8px">
-            <b>Criterio resolutivo:</b> {criterio_html}
-          </div>
-          <div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px">
-            {SVG['shield_check']} <span><b>Instancia competente:</b> {escape(appr)}</span>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # 2. PROTOCOLO DE VERIFICACIÓN PARA LA COORDINADORA (PROMINENTE)
-        actions = result.get("acciones_coordinadora", [])
-        if actions:
-            st.markdown(f"<div style='margin:14px 0 6px 0;display:flex;align-items:center;gap:6px;'><b style='font-size:0.88rem;color:#0F172A'>{SVG['clipboard_check']} Protocolo de verificación en sistema y expediente</b></div>", unsafe_allow_html=True)
-            for act in actions:
-                st.checkbox(act, value=False, key=f"chk_{hash(act)}")
-
-        # 3. FUNDAMENTACIÓN TÉCNICA
-        reason = result.get("razonamiento", "")
-        if reason:
-            with st.expander("Ver fundamentación y razonamiento normativo"):
-                st.markdown(f'<div class="reason-box">{escape(reason)}</div>', unsafe_allow_html=True)
-
-        st.markdown("<hr style='margin:16px 0'>", unsafe_allow_html=True)
-
-        # 4. BORRADOR DE COMUNICACIÓN PARA EL ESTUDIANTE (POST-VALIDACIÓN)
-        st.markdown("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px'><b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante (Post-validación)</b></div>", unsafe_allow_html=True)
-
-        draft = result.get("borrador_alumno", "")
-        # Salvaguarda final: si contiene JSON crudo, extraer solo el mensaje humano
-        if isinstance(draft, str) and (draft.strip().startswith("{") or '"dictamen_coordinacion"' in draft):
-            import re as _re_ui
-            m_inner = _re_ui.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', draft, _re_ui.DOTALL)
-            if not m_inner:
-                m_inner = _re_ui.search(r'(Estimad[oa][\s\S]*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$|\Z)', draft)
-            if m_inner:
-                draft = m_inner.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
-            else:
-                draft = result.get("dictamen_coordinacion", {}).get("resumen_ejecutivo", "") or result.get("razonamiento", "")
-
-        st.markdown(f'<div class="draft-box">{escape(draft)}</div>', unsafe_allow_html=True)
-
-        # Botones de Copia Rápidos
-        b_c1, b_c2 = st.columns(2)
-        copia_bloqueada = bool(result.get("validacion_pendiente"))
-        if copia_bloqueada:
-            st.warning("El borrador requiere validación del ámbito o de su sustento antes de compartirse.")
-        wa_text = f"*Coordinación Académica ESAN*\n\n{draft}"
-        # El borrador ya incluye saludo; no repetirlo en el correo copiado.
-        mail_text = draft
-
-        with b_c1:
-            if st.button("Copiar formato WhatsApp", key="btn_cp_wa", use_container_width=True, disabled=copia_bloqueada):
-                st.code(wa_text, language=None)
-                st.toast("Texto preparado para WhatsApp — cópialo del recuadro")
-        with b_c2:
-            if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True, disabled=copia_bloqueada):
-                st.code(mail_text, language=None)
-                st.toast("Texto preparado para Correo — cópialo del recuadro")
-
-    # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
-    with col_norm:
-        citas = result.get("citas_normativas", [])
-        documentos = len({c.get("documento", "") for c in citas})
-        st.markdown(
-            f'<div class="esan-card-title">{SVG["book"]} Citas verificadas: '
-            f'{len(citas)} · Documentos: {documentos}</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption(
-            f"Se recuperaron {len(sources)} fragmentos para el análisis. "
-            "Solo se muestran extractos que coinciden literalmente con un fragmento recuperado; "
-            "esto no certifica vigencia ni aplicabilidad jurídica."
-        )
-        auditoria = result.get("auditoria_citas", {})
-        if auditoria.get("duplicadas") or auditoria.get("no_verificables"):
-            st.caption(
-                f"Control automático: {auditoria.get('duplicadas', 0)} citas duplicadas "
-                f"y {auditoria.get('no_verificables', 0)} citas sin coincidencia literal descartadas."
-            )
-        if not citas:
-            st.warning(
-                "No hay citas textuales verificadas para respaldar este dictamen. "
-                "La búsqueda recuperó material contextual, pero no constituye por sí sola "
-                "prueba normativa. No emitir la comunicación sin revisión institucional."
-            )
-        elif result.get("validacion_pendiente"):
-            st.warning(
-                "Hay citas literales, pero todavía falta confirmar el programa y "
-                "la aplicabilidad normativa. No emitir una respuesta definitiva hasta verificarlo."
-            )
-
-        raw_items = {}
-        for c in citas:
-            num = c.get("numero", 0)
-            raw_items[num] = c
-
-        if not raw_items:
-            for i_s, s in enumerate(sources[:6], 1):
-                raw_items[i_s] = {
-                    "numero": i_s,
-                    "documento": s["source"],
-                    "seccion": s["section"],
-                    "pagina": str(s["page"]),
-                    "extracto": s["text"][:220],
-                }
-
-        # ── Agrupar citas por documento (todas las citas y recuadros en una sola tarjeta por archivo) ──
-        import unicodedata as _ud
-
-        def _norm_docname(name):
-            n = _ud.normalize("NFD", name.lower())
-            n = "".join(c for c in n if _ud.category(c) != "Mn")
-            return n.strip()
-
-        grouped = {}   # key = norm_docname -> dict con info del doc y lista de citas
-        order = []
-        for num, c in sorted(raw_items.items()):
-            doc_name_raw = c.get("documento", "")
-            nkey = _norm_docname(doc_name_raw)
-            if nkey not in grouped:
-                fb_src = ""
-                fb_pg = ""
-                if isinstance(num, int) and 1 <= num <= len(sources):
-                    fb_src = sources[num - 1].get("source", "")
-                    fb_pg = str(sources[num - 1].get("page", ""))
-                grouped[nkey] = {
-                    "doc_name": doc_name_raw or fb_src,
-                    "fallback_source": fb_src,
-                    "citas": [],
-                }
-                order.append(nkey)
-
-            grp = grouped[nkey]
-            # Extraer solo el número de página limpio (sin duplicar "Pág.")
-            p_raw = c.get("pagina", "")
-            p_digits = re.findall(r"\d+", str(p_raw))
-            clean_p = p_digits[0] if p_digits else str(p_raw).strip()
-
-            grp["citas"].append({
-                "num": num,
-                "seccion": c.get("seccion", ""),
-                "pagina": clean_p,
-                "extracto": c.get("extracto", ""),
-            })
-
-        for card_idx, nkey in enumerate(order, 1):
-            grp = grouped[nkey]
-            doc_name = grp["doc_name"]
-            fallback_source = grp["fallback_source"]
-            all_citas = grp["citas"]
-            first_pg = all_citas[0]["pagina"] if all_citas else ""
-
-            doc_drive_url = get_file_drive_url(
-                filename=doc_name,
-                page=first_pg,
-                fallback_filename=fallback_source,
-                fallback_page=first_pg,
-            )
-
-            safe_doc_name = escape(doc_name)
-            safe_drive_url = escape(doc_drive_url, quote=True)
-
-            # Tarjeta contenedora única del Documento
-            st.markdown(f"""
-            <div class="cite-card" style="margin-bottom:12px; border-left:4px solid #D31418;">
-              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-                <div style="display:flex;align-items:flex-start;gap:8px">
-                  <span class="cite-num">{card_idx}</span>
-                  <div>
-                    <div class="cite-source">{safe_doc_name}</div>
-                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px">{len(all_citas)} referencia(s) citada(s) en este documento</div>
-                  </div>
-                </div>
-                <a href="{safe_drive_url}" target="_blank" rel="noopener noreferrer" class="drive-link" style="font-size:0.75rem;white-space:nowrap">
-                  {SVG["drive"]} Ver en Drive
-                </a>
+# ── ESAN-F4-WORKSPACE: FORMULARIO IZQUIERDA, RESPUESTA DERECHA ─────────────
+esan_workspace_left, esan_workspace_right = st.columns([0.36, 0.64], gap="medium")
+with esan_workspace_left:
+    with st.container():
+        st.markdown('<p class="esan4-panel-eyebrow esan4-panel-left">01 / CONSULTA Y CONTEXTO</p>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("""<div class="esan3-form-marker"></div>""", unsafe_allow_html=True)
+            st.markdown("""
+            <div class="esan3-form-head">
+              <span class="esan3-number">02</span>
+              <div class="esan3-form-head-text">
+                <span>CONSULTA PERSONALIZADA</span>
+                <h2>Consulta o Caso del Estudiante</h2>
+                <p>Selecciona el programa, describe el caso y revisa los parámetros antes de emitir un dictamen.</p>
               </div>
+              <span class="esan3-form-head-note">ANÁLISIS SUJETO A VALIDACIÓN</span>
+            </div>
             """, unsafe_allow_html=True)
 
-            # Mostrar TODAS las citas / recuadros amarillos de este documento
-            for sub_i, cita in enumerate(all_citas, 1):
-                c_sec = cita["seccion"]
-                c_pg = cita["pagina"]
-                c_ext = cita["extracto"]
+            current_form_id = st.session_state.form_id
 
-                badge_pg = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:5px;font-size:0.72rem;font-weight:700;border:1px solid #FECACA">Pág. {escape(str(c_pg))}</span>' if c_pg else ""
-                sec_text = f'<span style="font-size:0.82rem;font-weight:700;color:#1E293B">{escape(str(c_sec))}</span>' if c_sec else ""
-
-                st.markdown(f"""
-                <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #E2E8F0">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                    <div>{sec_text}</div>
-                    <div>{badge_pg}</div>
-                  </div>
-                  {f'<div class="cite-excerpt" style="margin-bottom:8px">"{escape(str(c_ext))}..."</div>' if c_ext else ''}
-                </div>
-                """, unsafe_allow_html=True)
-
-                btn_label = f"🔍 Ver y resaltar en PDF (Pág. {c_pg})" if c_pg else "🔍 Ver y resaltar en PDF"
-                if st.button(
-                    btn_label,
-                    key=f"btn_pdf_modal_{card_idx}_{sub_i}_{cita['num']}",
-                    use_container_width=True,
-                    type="primary",
-                    help=f"Abre el PDF oficial en la página {c_pg} y resalta este extracto exacto."
-                ):
-                    show_pdf_viewer_modal(
-                        doc_name=doc_name,
-                        page_val=c_pg,
-                        extracto=c_ext,
-                        seccion=c_sec,
-                        fallback_source=fallback_source,
-                        drive_url=doc_drive_url,
-                    )
-
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-# ── BOTTOM DOCK DE CONSULTA (AMPLIO, ELEGANTE E INSTITUCIONAL) ────────────────
-st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
-
-with st.container():
-    st.markdown(f"""
-    <div style="border-top:2px solid #F1F5F9;padding-top:14px;margin-top:10px">
-      <div style="display:flex;align-items:center;gap:6px;font-size:0.88rem;font-weight:700;color:#0F172A;margin-bottom:6px">
-        {SVG["search"]} Consulta o Caso del Estudiante
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    current_form_id = st.session_state.form_id
-
-    # ── SELECTOR DE PROGRAMA (OBLIGATORIO) ────────────────────────────────
-    st.markdown(
-        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
-        f'{SVG["grad_cap"]} Tipo de programa del participante '
-        '<span style="color:#D31418;font-weight:900">*</span>'
-        '<span style="font-weight:400;color:#64748B;font-size:0.75rem;margin-left:4px">(obligatorio)</span>'
-        '</div>',
-        unsafe_allow_html=True
-    )
-    programa_options = ["PEE", "PADE", "PAE", "Diploma", "CIE", "Maestría", "Doctorado"]
-    programa_sel = st.radio(
-        "Programa",
-        options=programa_options,
-        index=None,
-        horizontal=True,
-        label_visibility="collapsed",
-        key=f"prog_choice_{current_form_id}",
-    )
-
-    if not programa_sel:
-        st.markdown(
-            '<div style="color:#D31418;font-size:0.78rem;margin-bottom:6px;display:flex;align-items:center;gap:4px">'
-            f'{SVG["alert"]} Debe seleccionar el tipo de programa antes de emitir el dictamen.'
-            '</div>',
-            unsafe_allow_html=True
-        )
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-
-    default_prompt = st.session_state.quick_q or ""
-    student_msg = st.text_area(
-        "Consulta del estudiante",
-        value=default_prompt,
-        height=90,
-        placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
-        label_visibility="collapsed",
-        max_chars=4000,
-        key=f"query_text_{current_form_id}",
-    )
-
-    # Si se cargo desde quick_q, limpiar para que no persista en futuros reruns
-    if st.session_state.quick_q:
-        st.session_state.quick_q = None
-
-    with st.expander("Parámetros opcionales del caso (ciclo, antecedentes del alumno)"):
-        extra_ctx = st.text_input(
-            "Contexto extra",
-            placeholder="Ej: ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
-            label_visibility="collapsed",
-            key=f"extra_ctx_{current_form_id}",
-        )
-
-    can_run = bool(api_key and student_msg.strip() and programa_sel)
-
-    # Botón principal prominente con feedback visual
-    col_run, col_hist = st.columns([3, 1])
-    with col_run:
-        button_help = "Haga clic para consultar la base reglamentaria y generar el dictamen." if can_run else "Seleccione el tipo de programa y escriba la consulta para activar este botón."
-        run_query = st.button(
-            "▶  Consultar reglamentos y emitir dictamen",
-            use_container_width=True,
-            type="primary",
-            disabled=not can_run,
-            help=button_help,
-        )
-    with col_hist:
-        if st.session_state.history:
+            # ── SELECTOR DE PROGRAMA (OBLIGATORIO) ────────────────────────────────
             st.markdown(
-                f'<div style="font-size:0.75rem;color:#64748B;text-align:center;padding-top:10px">'
-                f'{len(st.session_state.history)} consulta(s) previas</div>',
+                f'<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:700;color:#0F172A;margin-bottom:4px">'
+                f'{SVG["grad_cap"]} Tipo de programa del participante '
+                '<span style="color:#D31418;font-weight:900">*</span>'
+                '<span style="font-weight:400;color:#64748B;font-size:0.75rem;margin-left:4px">(obligatorio)</span>'
+                '</div>',
                 unsafe_allow_html=True
             )
+            programa_options = ["PEE", "PADE", "PAE", "Diploma", "CIE", "Maestría", "Doctorado"]
+            # ESAN-F5-POLISH · selector adaptativo (mismo key y valor)
+            if hasattr(st, "segmented_control"):
+                programa_sel = st.segmented_control(
+                    "Programa",
+                    options=programa_options,
+                    selection_mode="single",
+                    default=None,
+                    label_visibility="collapsed",
+                    key=f"prog_choice_{current_form_id}",
+                )
+            else:
+                if hasattr(st, "pills"):
+                    programa_sel = st.pills(
+                        "Programa",
+                        options=programa_options,
+                        selection_mode="single",
+                        default=None,
+                        label_visibility="collapsed",
+                        key=f"prog_choice_{current_form_id}",
+                    )
+                else:
+                    programa_sel = st.radio(
+                        "Programa", options=programa_options, index=None,
+                        horizontal=False, label_visibility="collapsed",
+                        key=f"prog_choice_{current_form_id}",
+                    )
+
+            if not programa_sel:
+                st.markdown(
+                    '<div style="color:#D31418;font-size:0.78rem;margin-bottom:6px;display:flex;align-items:center;gap:4px">'
+                    f'{SVG["alert"]} Debe seleccionar el tipo de programa antes de emitir el dictamen.'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+            default_prompt = st.session_state.quick_q or ""
+            student_msg = st.text_area(
+                "Consulta del estudiante",
+                value=default_prompt,
+                height=90,
+                placeholder="Pegue o redacte aquí la consulta del estudiante (ej: Alumno solicita rendir evaluación extemporánea por descanso médico)...",
+                label_visibility="collapsed",
+                max_chars=4000,
+                key=f"query_text_{current_form_id}",
+            )
+
+            # Si se cargo desde quick_q, limpiar para que no persista en futuros reruns
+            if st.session_state.quick_q:
+                st.session_state.quick_q = None
+
+            with st.expander("Parámetros opcionales del caso (ciclo, antecedentes del alumno)"):
+                extra_ctx = st.text_input(
+                    "Contexto extra",
+                    placeholder="Ej: ciclo V, alumno presenta solicitud fuera de plazo de 48 horas...",
+                    label_visibility="collapsed",
+                    key=f"extra_ctx_{current_form_id}",
+                )
+
+            can_run = bool(api_key and student_msg.strip() and programa_sel)
+
+            # Botón principal prominente con feedback visual
+            button_help = "Haga clic para consultar la base reglamentaria y generar el dictamen." if can_run else "Seleccione el tipo de programa y escriba la consulta para activar este botón."
+            run_query = st.button(
+                "▶  Consultar reglamentos y emitir dictamen",
+                use_container_width=True,
+                type="primary",
+                disabled=not can_run,
+                help=button_help,
+            )
+            if st.session_state.history:
+                st.markdown(
+                    f'<div style="font-size:0.75rem;color:#64748B;text-align:center;padding-top:10px">'
+                    f'{len(st.session_state.history)} consulta(s) previas</div>',
+                    unsafe_allow_html=True
+                )
+with esan_workspace_right:
+    esan_response_slot = st.empty()  # ESAN-F6-EXPERIENCE: respuesta sustituible
+    with esan_response_slot.container():
+        with st.container():
+            st.markdown('<p class="esan4-panel-eyebrow esan4-panel-right">02 / RESULTADO Y EVIDENCIAS</p>', unsafe_allow_html=True)
+            if result is None:
+                # ESAN-F3-COMPOSITION · Tarjetas unificadas con botones funcionales nativos.
+                st.markdown("""
+                <div class="esan3-hero">
+                  <div class="esan3-hero-main">
+                    <div class="esan3-eyebrow"><span class="esan3-mark"></span>CENTRO DE CONSULTAS ACADÉMICAS</div>
+                    <h1>Consultas Reglamentarias y Casuística Estudiantil</h1>
+                    <p>Consulta procedimientos institucionales o analiza un caso estudiantil con respaldo documental.
+                       Una experiencia de trabajo preparada para Coordinación Académica.</p>
+                  </div>
+                  <div class="esan3-hero-aside">
+                    <div class="esan3-hero-aside-symbol"></div>
+                    <span>ORIENTACIÓN INSTITUCIONAL</span>
+                    <strong>Asistencia normativa con IA</strong>
+                    <small>Todo dictamen requiere verificación de vigencia y aplicabilidad.</small>
+                  </div>
+                </div>
+                <div class="esan3-section-intro">
+                   <div><span class="esan3-number">01</span><div><h2>Elige el tipo de consulta</h2><p>Accesos rápidos a procedimientos frecuentes</p></div></div>
+                   <span class="esan3-section-meta">4 categorías disponibles</span>
+                </div>
+                """, unsafe_allow_html=True)
+                c_c1, c_c2 = st.columns(2, gap="medium")
+                with c_c1:
+                    with st.container(border=True):
+                        st.markdown(f"""
+                        <div class="esan3-card-head">
+                            <span class="esan3-icon">{SVG['scale']}</span>
+                            <div class="esan3-card-content">
+                              <span class="esan3-card-category">PROCEDIMIENTOS ACADÉMICOS</span>
+                              <h3>Reconsideración de Evaluaciones</h3>
+                              <p>Plazos reglamentarios, requisitos formales e instancia resolutiva ante reclamos de calificación.</p>
+                            </div>
+                            <span class="esan3-card-index">01</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button("Consultar plazos y trámite de reconsideración →", key="q_recons", use_container_width=True):
+                            st.session_state.quick_q = "¿Cuándo puedo pedir reconsideración de nota y ante qué autoridad corresponde presentarla?"
+                            st.session_state.form_id += 1
+                            st.rerun()
+                    with st.container(border=True):
+                        st.markdown(f"""
+                        <div class="esan3-card-head">
+                            <span class="esan3-icon esan3-icon-blue">{SVG['chip']}</span>
+                            <div class="esan3-card-content">
+                              <span class="esan3-card-category">DIRECTIVAS INSTITUCIONALES</span>
+                              <h3>Lineamientos de Inteligencia Artificial</h3>
+                              <p>Disposiciones institucionales para docentes y alumnos sobre el uso de herramientas IA en evaluaciones.</p>
+                            </div>
+                            <span class="esan3-card-index">03</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button("Consultar directiva sobre uso de IA →", key="q_ia", use_container_width=True):
+                            st.session_state.quick_q = "¿Cuáles son los lineamientos sobre el uso de Inteligencia Artificial para docentes y alumnos en ESAN?"
+                            st.session_state.form_id += 1
+                            st.rerun()
+                with c_c2:
+                    with st.container(border=True):
+                        st.markdown(f"""
+                        <div class="esan3-card-head">
+                            <span class="esan3-icon esan3-icon-blue">{SVG['grad_cap']}</span>
+                            <div class="esan3-card-content">
+                              <span class="esan3-card-category">GRADOS ACADÉMICOS</span>
+                              <h3>Requisitos para Grado de Bachiller</h3>
+                              <p>Cómputo de créditos académicos, acreditación obligatoria de idiomas y condiciones de graduación.</p>
+                            </div>
+                            <span class="esan3-card-index">02</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button("Consultar requisitos de bachillerato →", key="q_bach", use_container_width=True):
+                            st.session_state.quick_q = "¿Cuáles son los requisitos y créditos necesarios para obtener el Grado de Bachiller?"
+                            st.session_state.form_id += 1
+                            st.rerun()
+                    with st.container(border=True):
+                        st.markdown(f"""
+                        <div class="esan3-card-head">
+                            <span class="esan3-icon esan3-icon-gold">{SVG['book']}</span>
+                            <div class="esan3-card-content">
+                              <span class="esan3-card-category">PROCESOS ADMINISTRATIVOS</span>
+                              <h3>Procedimiento de Devolución y Retiro</h3>
+                              <p>Plazos de desistimiento, cronograma de retenciones y trámite formal de retiro de programa.</p>
+                            </div>
+                            <span class="esan3-card-index">04</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button("Consultar política de devoluciones y retiros →", key="q_ret", use_container_width=True):
+                            st.session_state.quick_q = "¿Cuál es el procedimiento formal y plazos para solicitar devolución de dinero o retiro de programa?"
+                            st.session_state.form_id += 1
+                            st.rerun()
+            else:
+                # ── PANEL DE CONSULTA EVALUADA (CONSULTA DEL ESTUDIANTE + PROGRAMA) ────────
+                last_q = st.session_state.get("last_query", "")
+                last_prog = st.session_state.get("last_program", "")
+                last_extra = st.session_state.get("last_extra_ctx", "")
+
+                if last_q:
+                    badge_prog_html = (
+                        f'<span style="background:#FEF2F2;border:1.5px solid #FECACA;color:#991B1B;'
+                        f'padding:3px 12px;border-radius:6px;font-size:0.8rem;font-weight:800;letter-spacing:0.03em;'
+                        f'display:inline-flex;align-items:center;gap:6px">'
+                        f'{SVG["grad_cap"]} Programa: {last_prog}</span>'
+                    ) if last_prog else ''
+
+                    extra_html = (
+                        f'<div style="font-size:0.8rem;color:#475569;margin-top:8px;padding-top:8px;'
+                        f'border-top:1px dashed #CBD5E1;display:flex;align-items:center;gap:6px">'
+                        f'<span style="font-weight:700;color:#0F172A">Contexto del caso ingresado:</span> {last_extra}</div>'
+                    ) if last_extra else ''
+
+                    st.markdown(f"""
+                    <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-left:5px solid #D31418;border-radius:10px;padding:14px 18px;margin-bottom:18px;box-shadow:0 1px 4px rgba(0,0,0,0.04)">
+                      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+                        <div style="font-size:0.75rem;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;display:flex;align-items:center;gap:6px">
+                          {SVG["search"]} Consulta del Estudiante Evaluada
+                        </div>
+                        {badge_prog_html}
+                      </div>
+                      <div style="font-size:0.95rem;color:#0F172A;font-weight:600;line-height:1.45">
+                        "{last_q}"
+                      </div>
+                      {extra_html}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                # ── VISTA DE RESULTADOS (2 COLUMNAS: RESPUESTA + RESPALDO NORMATIVO) ───────
+                st.markdown("""
+                <div class="esan3-results-intro">
+                   <span class="esan3-results-kicker">EXPEDIENTE DE CONSULTA</span>
+                   <h2>Resultado del análisis normativo</h2>
+                   <p>Consulta las conclusiones preliminares y su respaldo documental. La validación institucional prevalece sobre la asistencia automática.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                col_resp, col_norm = st.tabs(["Dictamen y validación", f"Citas y documentos ({len(result.get('citas_normativas', []))})"])
+
+                # ═════════════════════════════════════════ COLUMNA 1: RESPUESTA PROPUESTA ═
+                with col_resp:
+                    st.markdown('<span class="esan3-colmark esan3-col-resp"></span>', unsafe_allow_html=True)
+                    _prog_sel = st.session_state.get('last_program', '') or st.session_state.get('programa_sel', '')
+                    _prog_badge = (
+                        f'<span style="background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;'
+                        f'border-radius:6px;padding:2px 10px;font-size:0.75rem;font-weight:700;margin-left:8px"'
+                        f'>{_prog_sel}</span>'
+                    ) if _prog_sel else ''
+                    st.markdown(
+                        f'<div class="esan-card-title">{SVG["scale"]} Dictamen Técnico y Validación para Coordinación{_prog_badge}</div>',
+                        unsafe_allow_html=True
+                    )
+
+                    # 1. DICTAMEN EJECUTIVO Y PROCEDENCIA (RESPUESTA PRINCIPAL PARA LA COORDINADORA)
+                    dictamen = result.get("dictamen_coordinacion", {})
+                    procedencia = dictamen.get("procedencia", "Evaluación de Coordinación Académica")
+                    resumen_ejecutivo = dictamen.get("resumen_ejecutivo", "") or result.get("razonamiento", "")
+                    appr = result.get("requiere_aprobacion", "La coordinadora puede resolver directamente")
+
+                    # Estilo de badge según procedencia
+                    proc_lower = procedencia.lower()
+                    if "no procede" in proc_lower:
+                        badge_bg, badge_border, badge_text = "#FEF2F2", "#FECACA", "#991B1B"
+                        icon_badge = SVG["alert"]
+                    elif "no contemplado" in proc_lower or "elevación" in proc_lower or "insuficiente" in proc_lower or "revisión" in proc_lower or "validación" in proc_lower:
+                        badge_bg, badge_border, badge_text = "#FFFBEB", "#FDE68A", "#92400E"
+                        icon_badge = SVG["alert"]
+                    else:
+                        badge_bg, badge_border, badge_text = "#F0FDF4", "#BBF7D0", "#166534"
+                        icon_badge = SVG["check"]
+
+                    # V3.1: las afirmaciones referenciadas sustituyen al resumen libre
+                    # dentro del recuadro. Nunca se duplica el criterio en otro apartado.
+                    # Los números proceden exclusivamente de citas ya validadas por Python.
+                    claims_linked = result.get("afirmaciones_citadas_validadas", [])
+                    citas_aceptadas = result.get("citas_normativas", [])
+                    partes_criterio = []
+                    if not result.get("validacion_pendiente") and isinstance(claims_linked, list):
+                        for claim in claims_linked:
+                            if not isinstance(claim, dict):
+                                continue
+                            texto = str(claim.get("texto", "")).strip()
+                            numeros = []
+                            for numero in claim.get("numeros", []):
+                                if isinstance(numero, int) and not isinstance(numero, bool) and 1 <= numero <= len(citas_aceptadas) and numero not in numeros:
+                                    numeros.append(numero)
+                            if texto and numeros:
+                                refs = " ".join(
+                                    f'<a href="#cita-{n}" style="color:#1D4ED8;font-weight:700;text-decoration:none">[{n}]</a>'
+                                    for n in numeros
+                                )
+                                partes_criterio.append(f"{escape(texto)} {refs}")
+
+                    if partes_criterio:
+                        criterio_html = " ".join(partes_criterio)
+                    else:
+                        # Sin relaciones verificadas, se conserva el resumen sin insertar
+                        # referencias arbitrarias. La interfaz conserva su estado de revisión.
+                        criterio_html = escape(resumen_ejecutivo)
+
+                    st.markdown(f"""
+                    <div style="background:{badge_bg};border:1.5px solid {badge_border};border-radius:8px;padding:12px 16px;margin-bottom:12px">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <span style="font-weight:800;font-size:0.88rem;color:{badge_text};text-transform:uppercase;letter-spacing:0.02em">
+                          {icon_badge} {escape(procedencia)}
+                        </span>
+                      </div>
+                      <div style="font-size:0.86rem;color:#1E293B;line-height:1.5;margin-bottom:8px">
+                        <b>Criterio resolutivo:</b> {criterio_html}
+                      </div>
+                      <div style="font-size:0.8rem;color:#475569;display:flex;align-items:center;gap:6px;border-top:1px solid rgba(0,0,0,0.06);padding-top:6px">
+                        {SVG['shield_check']} <span><b>Instancia competente:</b> {escape(appr)}</span>
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # 2. PROTOCOLO DE VERIFICACIÓN PARA LA COORDINADORA (PROMINENTE)
+                    actions = result.get("acciones_coordinadora", [])
+                    if actions:
+                        st.markdown(f"<div style='margin:14px 0 6px 0;display:flex;align-items:center;gap:6px;'><b style='font-size:0.88rem;color:#0F172A'>{SVG['clipboard_check']} Protocolo de verificación en sistema y expediente</b></div>", unsafe_allow_html=True)
+                        for act in actions:
+                            st.checkbox(act, value=False, key=f"chk_{hash(act)}")
+
+                    # 3. FUNDAMENTACIÓN TÉCNICA
+                    reason = result.get("razonamiento", "")
+                    if reason:
+                        with st.expander("Ver fundamentación y razonamiento normativo"):
+                            st.markdown(f'<div class="reason-box">{escape(reason)}</div>', unsafe_allow_html=True)
+
+                    st.markdown("<hr style='margin:16px 0'>", unsafe_allow_html=True)
+
+                    # 4. BORRADOR DE COMUNICACIÓN PARA EL ESTUDIANTE (POST-VALIDACIÓN)
+                    st.markdown("<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px'><b style='font-size:0.88rem;color:#0F172A'>Borrador de comunicación para el estudiante (Post-validación)</b></div>", unsafe_allow_html=True)
+
+                    draft = result.get("borrador_alumno", "")
+                    # Salvaguarda final: si contiene JSON crudo, extraer solo el mensaje humano
+                    if isinstance(draft, str) and (draft.strip().startswith("{") or '"dictamen_coordinacion"' in draft):
+                        import re as _re_ui
+                        m_inner = _re_ui.search(r'"borrador_alumno"\s*:\s*"(.*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$)', draft, _re_ui.DOTALL)
+                        if not m_inner:
+                            m_inner = _re_ui.search(r'(Estimad[oa][\s\S]*?)(?:"\s*,\s*"[a-zA-Z_]+"|"\s*\}\s*$|\Z)', draft)
+                        if m_inner:
+                            draft = m_inner.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+                        else:
+                            draft = result.get("dictamen_coordinacion", {}).get("resumen_ejecutivo", "") or result.get("razonamiento", "")
+
+                    st.markdown(f'<div class="draft-box">{escape(draft)}</div>', unsafe_allow_html=True)
+
+                    # Botones de Copia Rápidos
+                    b_c1, b_c2 = st.columns(2)
+                    copia_bloqueada = bool(result.get("validacion_pendiente"))
+                    if copia_bloqueada:
+                        st.warning("El borrador requiere validación del ámbito o de su sustento antes de compartirse.")
+                    wa_text = f"*Coordinación Académica ESAN*\n\n{draft}"
+                    # El borrador ya incluye saludo; no repetirlo en el correo copiado.
+                    mail_text = draft
+
+                    with b_c1:
+                        if st.button("Copiar formato WhatsApp", key="btn_cp_wa", use_container_width=True, disabled=copia_bloqueada):
+                            st.code(wa_text, language=None)
+                            st.toast("Texto preparado para WhatsApp — cópialo del recuadro")
+                    with b_c2:
+                        if st.button("Copiar formato Correo", key="btn_cp_mail", use_container_width=True, disabled=copia_bloqueada):
+                            st.code(mail_text, language=None)
+                            st.toast("Texto preparado para Correo — cópialo del recuadro")
+
+                # ═════════════════════════════════════════ COLUMNA 2: RESPALDO NORMATIVO ═══
+                with col_norm:
+                    st.markdown('<span class="esan3-colmark esan3-col-norm"></span>', unsafe_allow_html=True)
+                    citas = result.get("citas_normativas", [])
+                    documentos = len({c.get("documento", "") for c in citas})
+                    # ESAN-F6-EXPERIENCE · datos verificados vs. material contextual
+                    referencias_relacionadas = not bool(citas)
+                    fragmentos_recuperados = len(sources)
+                    documentos_relacionados = len({str(s.get("source", "")) for s in sources if s.get("source")})
+                    st.markdown(
+                        f'<div class="esan6-evidence-header"><div class="esan6-eyebrow">TRAZABILIDAD DOCUMENTAL</div>'
+                        f'<h3>Evidencia documental y referencias</h3>'
+                        f'<div class="esan6-evidence-metrics">'
+                        f'<div class="esan6-metric"><strong>{len(citas)}</strong><span>Citas textuales verificadas</span></div>'
+                        f'<div class="esan6-metric"><strong>{documentos if citas else documentos_relacionados}</strong>'
+                        f'<span>{"Documentos con citas verificadas" if citas else "Documentos relacionados"}</span></div>'
+                        f'</div></div>', unsafe_allow_html=True,
+                    )
+                    st.caption(
+                        f"Se recuperaron {len(sources)} fragmentos para el análisis. "
+                        "Solo se muestran extractos que coinciden literalmente con un fragmento recuperado; "
+                        "esto no certifica vigencia ni aplicabilidad jurídica."
+                    )
+                    auditoria = result.get("auditoria_citas", {})
+                    if auditoria.get("duplicadas") or auditoria.get("no_verificables"):
+                        st.caption(
+                            f"Control automático: {auditoria.get('duplicadas', 0)} citas duplicadas "
+                            f"y {auditoria.get('no_verificables', 0)} citas sin coincidencia literal descartadas."
+                        )
+                    if not citas:
+                        st.warning(
+                            "No hay citas textuales verificadas para respaldar este dictamen. "
+                            "La búsqueda recuperó material contextual, pero no constituye por sí sola "
+                            "prueba normativa. No emitir la comunicación sin revisión institucional."
+                        )
+                    elif result.get("validacion_pendiente"):
+                        st.warning(
+                            "Hay citas literales, pero todavía falta confirmar el programa y "
+                            "la aplicabilidad normativa. No emitir una respuesta definitiva hasta verificarlo."
+                        )
+
+                    with st.container(height=520, border=False):
+                        if referencias_relacionadas:
+                            st.markdown(
+                                '<div class="esan6-related-intro">'
+                                '<span class="esan6-related-dot"></span>'
+                                '<div><strong>Material relacionado con la consulta</strong>'
+                                '<p>Estos fragmentos fueron recuperados por similitud temática. '
+                                'No son citas verificadas ni acreditan por sí mismos la vigencia o aplicabilidad de una norma.</p>'
+                                '</div></div>', unsafe_allow_html=True,
+                            )
+                        else:
+                            st.markdown(
+                                '<div class="esan6-verified-intro">Extractos con coincidencia textual verificada. '
+                                'Su vigencia y aplicabilidad deben confirmarse.</div>', unsafe_allow_html=True,
+                            )
+                        raw_items = {}
+                        for c in citas:
+                            num = c.get("numero", 0)
+                            raw_items[num] = c
+
+                        if not raw_items:
+                            for i_s, s in enumerate(sources[:6], 1):
+                                raw_items[i_s] = {
+                                    "numero": i_s,
+                                    "documento": s["source"],
+                                    "seccion": s["section"],
+                                    "pagina": str(s["page"]),
+                                    "extracto": s["text"][:220],
+                                }
+
+                        # ── Agrupar citas por documento (todas las citas y recuadros en una sola tarjeta por archivo) ──
+                        import unicodedata as _ud
+
+                        def _norm_docname(name):
+                            n = _ud.normalize("NFD", name.lower())
+                            n = "".join(c for c in n if _ud.category(c) != "Mn")
+                            return n.strip()
+
+                        grouped = {}   # key = norm_docname -> dict con info del doc y lista de citas
+                        order = []
+                        for num, c in sorted(raw_items.items()):
+                            doc_name_raw = c.get("documento", "")
+                            nkey = _norm_docname(doc_name_raw)
+                            if nkey not in grouped:
+                                fb_src = ""
+                                fb_pg = ""
+                                if isinstance(num, int) and 1 <= num <= len(sources):
+                                    fb_src = sources[num - 1].get("source", "")
+                                    fb_pg = str(sources[num - 1].get("page", ""))
+                                grouped[nkey] = {
+                                    "doc_name": doc_name_raw or fb_src,
+                                    "fallback_source": fb_src,
+                                    "citas": [],
+                                }
+                                order.append(nkey)
+
+                            grp = grouped[nkey]
+                            # Extraer solo el número de página limpio (sin duplicar "Pág.")
+                            p_raw = c.get("pagina", "")
+                            p_digits = re.findall(r"\d+", str(p_raw))
+                            clean_p = p_digits[0] if p_digits else str(p_raw).strip()
+
+                            grp["citas"].append({
+                                "num": num,
+                                "seccion": c.get("seccion", ""),
+                                "pagina": clean_p,
+                                "extracto": c.get("extracto", ""),
+                            })
+
+                        for card_idx, nkey in enumerate(order, 1):
+                            grp = grouped[nkey]
+                            doc_name = grp["doc_name"]
+                            fallback_source = grp["fallback_source"]
+                            all_citas = grp["citas"]
+                            first_pg = all_citas[0]["pagina"] if all_citas else ""
+
+                            doc_drive_url = get_file_drive_url(
+                                filename=doc_name,
+                                page=first_pg,
+                                fallback_filename=fallback_source,
+                                fallback_page=first_pg,
+                            )
+
+                            safe_doc_name = escape(doc_name)
+                            safe_drive_url = escape(doc_drive_url, quote=True)
+
+                            # Tarjeta contenedora única del Documento
+                            st.markdown(f"""
+                            <div class="cite-card {'esan6-related-card' if referencias_relacionadas else 'esan6-verified-card'}" style="margin-bottom:12px;">
+                              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+                                <div style="display:flex;align-items:flex-start;gap:8px">
+                                  <span class="cite-num">{card_idx}</span>
+                                  <div>
+                                    <div class="cite-source">{safe_doc_name}</div>
+                                    <div style="font-size:0.75rem;color:#64748B;margin-top:2px">{len(all_citas)} {"fragmento(s) relacionados" if referencias_relacionadas else "cita(s) textuales"} en este documento</div>
+                                  </div>
+                                </div>
+                                <a href="{safe_drive_url}" target="_blank" rel="noopener noreferrer" class="drive-link" style="font-size:0.75rem;white-space:nowrap">
+                                  {SVG["drive"]} Ver en Drive
+                                </a>
+                              </div>
+                            """, unsafe_allow_html=True)
+
+                            # Mostrar TODAS las citas / recuadros amarillos de este documento
+                            for sub_i, cita in enumerate(all_citas, 1):
+                                c_sec = cita["seccion"]
+                                c_pg = cita["pagina"]
+                                c_ext = cita["extracto"]
+
+                                badge_pg = f'<span style="background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:5px;font-size:0.72rem;font-weight:700;border:1px solid #FECACA">Pág. {escape(str(c_pg))}</span>' if c_pg else ""
+                                sec_text = f'<span style="font-size:0.82rem;font-weight:700;color:#1E293B">{escape(str(c_sec))}</span>' if c_sec else ""
+
+                                st.markdown(f"""
+                                <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #E2E8F0">
+                                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                                    <div>{sec_text}</div>
+                                    <div>{badge_pg}</div>
+                                  </div>
+                                  {f'<div class="cite-excerpt" style="margin-bottom:8px">"{escape(str(c_ext))}..."</div>' if c_ext else ''}
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                                btn_label = f"🔍 Ver y resaltar en PDF (Pág. {c_pg})" if c_pg else "🔍 Ver y resaltar en PDF"
+                                if st.button(
+                                    btn_label,
+                                    key=f"btn_pdf_modal_{card_idx}_{sub_i}_{cita['num']}",
+                                    use_container_width=True,
+                                    type="primary",
+                                    help=f"Abre el PDF oficial en la página {c_pg} y resalta este extracto exacto."
+                                ):
+                                    show_pdf_viewer_modal(
+                                        doc_name=doc_name,
+                                        page_val=c_pg,
+                                        extracto=c_ext,
+                                        seccion=c_sec,
+                                        fallback_source=fallback_source,
+                                        drive_url=doc_drive_url,
+                                    )
+
+                            st.markdown("</div>", unsafe_allow_html=True)
+                            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── PROCESAMIENTO DE CONSULTA ─────────────────────────────────────────────────
 if run_query and api_key and student_msg.strip():
     # Banner de carga visual y prominente
-    loading_slot = st.empty()
-    loading_slot.markdown(
-        f"""
-        <div style="background:#0F172A;border:1px solid #1E293B;color:#F8FAFC;border-radius:10px;padding:18px 22px;margin:14px 0;display:flex;align-items:center;gap:16px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
-          <div style="width:26px;height:26px;border:3px solid #D31418;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0"></div>
-          <div>
-            <div style="font-weight:700;font-size:0.95rem;color:#FFFFFF;display:flex;align-items:center;gap:8px">
-              Procesando dictamen normativo para: <span style="background:#D31418;color:#FFFFFF;padding:1px 8px;border-radius:4px;font-size:0.8rem">{programa_sel}</span>
-            </div>
-            <div style="font-size:0.78rem;color:#94A3B8;margin-top:3px">
-              Buscando artículos en reglamentos vigentes, evaluando procedencia y generando propuesta de correo...
-            </div>
-          </div>
-        </div>
-        <style>@keyframes spin {{ to {{ transform: rotate(360deg); }} }}</style>
-        """,
-        unsafe_allow_html=True
-    )
+    # ESAN-F6-EXPERIENCE · el estado de carga aparece en el panel de respuesta
+    esan_response_slot.empty()
+    with esan_response_slot.container():
+        st.markdown(
+            f'<section class="esan6-loading" role="status" aria-live="polite">'
+            f'<span class="esan6-loading-spinner" aria-hidden="true"></span>'
+            f'<div><span class="esan6-eyebrow">ANÁLISIS EN CURSO</span>'
+            f'<h2>Preparando el dictamen · {escape(str(programa_sel))}</h2>'
+            f'<p>Consultando reglamentos, contrastando referencias y elaborando una propuesta sujeta a validación institucional.</p>'
+            f'</div></section>', unsafe_allow_html=True,
+        )
     try:
         if not is_indexed and api_key:
             build_vector_store(api_key=api_key)
@@ -1254,8 +1347,9 @@ if run_query and api_key and student_msg.strip():
         # Avanzar form_id: limpia automáticamente el textarea y deselecciona el programa sin tocar keys bloqueadas
         st.session_state.form_id += 1
         st.session_state.scroll_to_top = True
-        loading_slot.empty()
+        esan_response_slot.empty()
         st.rerun()
     except Exception as e:
-        loading_slot.empty()
-        st.error(f"Error al procesar la consulta: {e}")
+        esan_response_slot.empty()
+        with esan_response_slot.container():
+            st.error(f"Error al procesar la consulta: {e}")

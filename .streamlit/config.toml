@@ -1,7 +1,11 @@
-# Tema institucional ESAN: configuración visual, no de lógica.
 [theme]
-primaryColor = "#CF1229"
-backgroundColor = "#F5F7FB"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#17253C"
-font = "sans serif"
+base = "light"
+# Rojo institucional ESAN (logotipo oficial)
+primaryColor = "#D31418"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F7F2F2"
+textColor = "#1E1517"
+
+[client]
+# Oculta el botón "Deploy" y deja el menú de Streamlit al mínimo.
+toolbarMode = "minimal"
